@@ -1,0 +1,68 @@
+{
+  "properties": [
+    {
+      "name": "app.upload.path",
+      "type": "java.lang.String",
+      "description": "Description for app.upload.path."
+    },
+    {
+      "name": "app.upload.max-file-size",
+      "type": "java.lang.String",
+      "description": "Description for app.upload.max-file-size."
+    },
+    {
+      "name": "app.upload.allowed-extensions",
+      "type": "java.lang.String",
+      "description": "Description for app.upload.allowed-extensions."
+    },
+    {
+      "name": "app.upload.image.max-width",
+      "type": "java.lang.String",
+      "description": "Description for app.upload.image.max-width."
+    },
+    {
+      "name": "app.upload.image.max-height",
+      "type": "java.lang.String",
+      "description": "Description for app.upload.image.max-height."
+    },
+    {
+      "name": "app.upload.image.quality",
+      "type": "java.lang.String",
+      "description": "Description for app.upload.image.quality."
+    },
+    {
+      "name": "springdoc.info.title",
+      "type": "java.lang.String",
+      "description": "Description for springdoc.info.title."
+    },
+    {
+      "name": "springdoc.info.description",
+      "type": "java.lang.String",
+      "description": "Description for springdoc.info.description."
+    },
+    {
+      "name": "springdoc.info.version",
+      "type": "java.lang.String",
+      "description": "Description for springdoc.info.version."
+    },
+    {
+      "name": "springdoc.info.contact.name",
+      "type": "java.lang.String",
+      "description": "Description for springdoc.info.contact.name."
+    },
+    {
+      "name": "springdoc.info.contact.email",
+      "type": "java.lang.String",
+      "description": "Description for springdoc.info.contact.email."
+    },
+    {
+      "name": "springdoc.security.bearer.scheme",
+      "type": "java.lang.String",
+      "description": "Description for springdoc.security.bearer.scheme."
+    },
+    {
+      "name": "springdoc.security.bearer.bearer-format",
+      "type": "java.lang.String",
+      "description": "Description for springdoc.security.bearer.bearer-format."
+    }
+  ] }
