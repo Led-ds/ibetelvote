@@ -5,7 +5,7 @@ import com.br.ibetelvote.application.mapper.AuthMapper;
 import com.br.ibetelvote.domain.entities.User;
 import com.br.ibetelvote.domain.services.AuthService;
 import com.br.ibetelvote.infrastructure.jwt.JwtService;
-import com.br.ibetelvote.infrastructure.repositories.UserRepository;
+import com.br.ibetelvote.infrastructure.repositories.UserJpaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -28,7 +28,7 @@ import java.util.UUID;
 public class AuthServiceImpl implements AuthService {
 
     private final AuthenticationManager authenticationManager;
-    private final UserRepository userRepository;
+    private final UserJpaRepository userJpaRepository;
     private final JwtService jwtService;
     private final AuthMapper authMapper;
 
@@ -53,7 +53,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // Se a autenticação foi bem-sucedida, busca o usuário para gerar os tokens
-        User user = userRepository.findByEmail(request.email())
+        User user = userJpaRepository.findByEmail(request.email())
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado após autenticação"));
 
         String accessToken = jwtService.generateAccessToken(user);
@@ -81,7 +81,7 @@ public class AuthServiceImpl implements AuthService {
         UUID userId = jwtService.extractUserId(refreshToken);
 
         // Busca o usuário. A validação do token é feita dentro do JwtService.
-        User user = userRepository.findById(userId)
+        User user = userJpaRepository.findById(userId)
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário do refresh token não encontrado"));
 
         // Valida o refresh token e o estado do usuário em uma única verificação
@@ -106,7 +106,7 @@ public class AuthServiceImpl implements AuthService {
     @Cacheable(value = "userProfile", key = "#userId")
     public UserProfileResponse getCurrentUser(UUID userId) {
         log.debug("Buscando dados do usuário: {}", userId);
-        User user = userRepository.findById(userId)
+        User user = userJpaRepository.findById(userId)
                 .filter(User::getAtivo) // Filtra apenas usuários ativos
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado ou desativado"));
 
@@ -137,7 +137,7 @@ public class AuthServiceImpl implements AuthService {
 
             // Extrai o ID e verifica se o usuário existe e está ativo no banco
             UUID userId = jwtService.extractUserId(token);
-            return userRepository.findById(userId)
+            return userJpaRepository.findById(userId)
                     .map(User::getAtivo)
                     .orElse(false);
 

@@ -1,6 +1,6 @@
 package com.br.ibetelvote.infrastructure.service;
 
-import com.br.ibetelvote.infrastructure.repositories.UserRepository;
+import com.br.ibetelvote.infrastructure.repositories.UserJpaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -15,13 +15,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class CustomUserDetailsService implements UserDetailsService {
 
-    private final UserRepository userRepository;
+    private final UserJpaRepository userJpaRepository;
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         log.debug("Carregando usuário por email: {}", username);
 
-        return userRepository.findByEmail(username)
+        return userJpaRepository.findByEmail(username)
                 .orElseThrow(() -> {
                     log.warn("Usuário não encontrado: {}", username);
                     return new UsernameNotFoundException("Usuário não encontrado: " + username);
