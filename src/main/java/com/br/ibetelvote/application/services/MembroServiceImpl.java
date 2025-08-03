@@ -5,10 +5,10 @@ import com.br.ibetelvote.application.mapper.MembroMapper;
 import com.br.ibetelvote.application.shared.dto.UploadPhotoResponse;
 import com.br.ibetelvote.domain.entities.Membro;
 import com.br.ibetelvote.domain.entities.User;
-import com.br.ibetelvote.domain.repositories.MembroRepository;
-import com.br.ibetelvote.domain.repositories.UserRepository;
 import com.br.ibetelvote.domain.services.FileStorageService;
 import com.br.ibetelvote.domain.services.MembroService;
+import com.br.ibetelvote.infrastructure.repositories.MembroJpaRepository;
+import com.br.ibetelvote.infrastructure.repositories.UserJpaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -30,8 +30,8 @@ import java.util.UUID;
 @Transactional
 public class MembroServiceImpl implements MembroService {
 
-    private final MembroRepository membroRepository;
-    private final UserRepository userRepository;
+    private final MembroJpaRepository membroRepository;
+    private final UserJpaRepository userRepository;
     private final MembroMapper membroMapper;
     private final FileStorageService fileStorageService;
 
@@ -69,11 +69,14 @@ public class MembroServiceImpl implements MembroService {
     @Transactional(readOnly = true)
     public MembroResponse getMembroById(UUID id) {
         log.debug("Buscando membro por ID: {}", id);
+        Membro membro = null;
 
-        Membro membro = membroRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Membro não encontrado com ID: " + id));
+        // Verificar se membro existe
+        if (!membroRepository.existsById(id)) {
+            throw new IllegalArgumentException("Membro não encontrado com ID: " + id);
+        }
 
-        return membroMapper.toResponse(membro);
+        return membroMapper.toResponse(membroRepository.save(id));
     }
 
     @Override
@@ -139,7 +142,7 @@ public class MembroServiceImpl implements MembroService {
             }
         }
 
-        membroRepository.deleteById(id);
+        membroRepository.delete(membro);
         log.info("Membro removido com sucesso - ID: {}", id);
     }
 
@@ -183,13 +186,18 @@ public class MembroServiceImpl implements MembroService {
         Membro membro = membroRepository.findById(membroId)
                 .orElseThrow(() -> new IllegalArgumentException("Membro não encontrado com ID: " + membroId));
 
-        // Verificar se user existe
-        User user = userRepository.findById(request.getUserId())
-                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado com ID: " + request.getUserId()));
+        if (!userRepository.existsById(request.getUserId())) {
+            throw new IllegalArgumentException("Usuário não encontrado com ID: " + request.getUserId());
+        }
 
-        // Verificar se user já está associado a outro membro
-        if (membroRepository.existsByUserId(request.getUserId())) {
+        User user = userRepository.findByUser(request.getUserId());
+
+        if (membroRepository.existsByUserId(user.getId())) {
             throw new IllegalArgumentException("Usuário já está associado a outro membro");
+        }
+
+        if (!user.isActive()) {
+            throw new IllegalArgumentException("Não é possível associar usuário inativo");
         }
 
         membro.associateUser(request.getUserId());

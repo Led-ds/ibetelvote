@@ -4,8 +4,8 @@ import com.br.ibetelvote.application.auth.dto.*;
 import com.br.ibetelvote.application.mapper.UserMapper;
 import com.br.ibetelvote.domain.entities.User;
 import com.br.ibetelvote.domain.entities.enus.UserRole;
-import com.br.ibetelvote.domain.repositories.UserRepository;
 import com.br.ibetelvote.domain.services.UserService;
+import com.br.ibetelvote.infrastructure.repositories.UserJpaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -27,7 +27,7 @@ import java.util.UUID;
 @Transactional
 public class UserServiceImpl implements UserService {
 
-    private final UserRepository userRepository;
+    private final UserJpaRepository userRepository;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
 
@@ -57,8 +57,11 @@ public class UserServiceImpl implements UserService {
     public UserResponse getUserById(UUID id) {
         log.debug("Buscando usuário por ID: {}", id);
 
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado com ID: " + id));
+        if (!userRepository.existsById(id)) {
+            throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
+        }
+
+        User user = userRepository.findByUser(id);
 
         return userMapper.toResponse(user);
     }
@@ -99,7 +102,9 @@ public class UserServiceImpl implements UserService {
             throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
         }
 
-        userRepository.deleteById(id);
+        User user = userRepository.findByUser(id);
+
+        userRepository.delete(user);
         log.info("Usuário removido com sucesso - ID: {}", id);
     }
 
@@ -110,8 +115,11 @@ public class UserServiceImpl implements UserService {
     public void activateUser(UUID id) {
         log.info("Ativando usuário ID: {}", id);
 
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado com ID: " + id));
+        if (!userRepository.existsById(id)) {
+            throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
+        }
+
+        User user = userRepository.findByUser(id);
 
         user.activate();
         userRepository.save(user);
@@ -124,8 +132,11 @@ public class UserServiceImpl implements UserService {
     public void deactivateUser(UUID id) {
         log.info("Desativando usuário ID: {}", id);
 
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado com ID: " + id));
+        if (!userRepository.existsById(id)) {
+            throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
+        }
+
+        User user = userRepository.findByUser(id);
 
         user.deactivate();
         userRepository.save(user);
@@ -138,8 +149,11 @@ public class UserServiceImpl implements UserService {
     public void lockUser(UUID id) {
         log.info("Bloqueando usuário ID: {}", id);
 
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado com ID: " + id));
+        if (!userRepository.existsById(id)) {
+            throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
+        }
+
+        User user = userRepository.findByUser(id);
 
         user.lockAccount();
         userRepository.save(user);
@@ -152,8 +166,11 @@ public class UserServiceImpl implements UserService {
     public void unlockUser(UUID id) {
         log.info("Desbloqueando usuário ID: {}", id);
 
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado com ID: " + id));
+        if (!userRepository.existsById(id)) {
+            throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
+        }
+
+        User user = userRepository.findByUser(id);
 
         user.unlockAccount();
         userRepository.save(user);
@@ -168,8 +185,11 @@ public class UserServiceImpl implements UserService {
     public void changeUserRole(UUID id, ChangeRoleRequest request) {
         log.info("Alterando role do usuário ID: {} para: {}", id, request.getNewRole());
 
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado com ID: " + id));
+        if (!userRepository.existsById(id)) {
+            throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
+        }
+
+        User user = userRepository.findByUser(id);
 
         UserRole oldRole = user.getRole();
         user.changeRole(request.getNewRole());
@@ -201,8 +221,11 @@ public class UserServiceImpl implements UserService {
             throw new IllegalArgumentException("Nova senha e confirmação não coincidem");
         }
 
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado com ID: " + id));
+        if (!userRepository.existsById(id)) {
+            throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
+        }
+
+        User user = userRepository.findByUser(id);
 
         // Validar senha atual
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
@@ -220,8 +243,11 @@ public class UserServiceImpl implements UserService {
     public void resetPassword(UUID id, String newPassword) {
         log.info("Resetando senha do usuário ID: {}", id);
 
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado com ID: " + id));
+        if (!userRepository.existsById(id)) {
+            throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
+        }
+
+        User user = userRepository.findByUser(id);
 
         user.updatePassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);

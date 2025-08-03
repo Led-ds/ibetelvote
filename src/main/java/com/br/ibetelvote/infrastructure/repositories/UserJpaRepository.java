@@ -51,4 +51,10 @@ public interface UserJpaRepository extends JpaRepository<User, UUID>, UserReposi
     @Override
     @Query("SELECT u FROM User u LEFT JOIN FETCH u.membro WHERE u.id = :id")
     Optional<User> findByIdWithMembro(@Param("id") UUID id);
+
+    boolean existsById(UUID id);
+
+    Optional<User> findById(UUID id);
+
+    User findByUser(UUID id);
 }

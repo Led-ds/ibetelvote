@@ -9,8 +9,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface MembroRepository {
-    Membro save(Membro membro);
-    Optional<Membro> findById(UUID id);
+    Membro save(UUID membro);
     Optional<Membro> findByEmail(String email);
     Optional<Membro> findByUserId(UUID userId);
     Page<Membro> findAll(Pageable pageable);

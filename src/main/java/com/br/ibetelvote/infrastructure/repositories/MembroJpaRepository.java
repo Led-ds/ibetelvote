@@ -86,4 +86,6 @@ public interface MembroJpaRepository extends JpaRepository<Membro, UUID>, Membro
 
     @Query("SELECT m FROM Membro m LEFT JOIN FETCH m.user WHERE m.email = :email")
     Optional<Membro> findByEmailWithUser(@Param("email") String email);
+
+    boolean existsById(UUID id);
 }
