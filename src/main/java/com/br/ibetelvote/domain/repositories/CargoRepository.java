@@ -9,7 +9,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface CargoRepository {
-    Cargo save(Cargo cargo);
     Page<Cargo> findAll(Pageable pageable);
     void deleteById(UUID id);
     boolean existsById(UUID id);

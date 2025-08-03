@@ -10,7 +10,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface VotoRepository {
-    Voto save(Voto voto);
     Optional<Voto> findById(UUID id);
     Page<Voto> findAll(Pageable pageable);
     void deleteById(UUID id);

@@ -2,9 +2,6 @@ package com.br.ibetelvote.application.mapper;
 
 import com.br.ibetelvote.application.eleicao.dto.*;
 import com.br.ibetelvote.domain.entities.Candidato;
-import com.br.ibetelvote.domain.entities.Cargo;
-import com.br.ibetelvote.domain.entities.Eleicao;
-import com.br.ibetelvote.domain.entities.Membro;
 import org.mapstruct.*;
 
 import java.util.List;
@@ -12,7 +9,8 @@ import java.util.List;
 @Mapper(
         componentModel = "spring",
         unmappedTargetPolicy = ReportingPolicy.IGNORE,
-        nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE
+        nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
+        uses = BasicInfoMapper.class
 )
 public interface CandidatoMapper {
 
@@ -31,10 +29,10 @@ public interface CandidatoMapper {
     @Mapping(target = "votos", ignore = true)
     Candidato toEntity(CreateCandidatoRequest request);
 
-    // === RESPONSE MAPPINGS ===
-    @Mapping(target = "membro", source = "membro", qualifiedByName = "mapMembroToBasicInfo")
-    @Mapping(target = "eleicao", source = "eleicao", qualifiedByName = "mapEleicaoToBasicInfo")
-    @Mapping(target = "cargo", source = "cargo", qualifiedByName = "mapCargoToBasicInfo")
+    // === RESPONSE MAPPING ===
+    @Mapping(target = "membro", source = "membro")
+    @Mapping(target = "eleicao", source = "eleicao")
+    @Mapping(target = "cargo", source = "cargo")
     @Mapping(target = "totalVotos", expression = "java(candidato.getTotalVotos())")
     @Mapping(target = "statusCandidatura", expression = "java(candidato.getStatusCandidatura())")
     @Mapping(target = "numeroFormatado", expression = "java(candidato.getNumeroFormatado())")
@@ -67,58 +65,6 @@ public interface CandidatoMapper {
     @Mapping(target = "votos", ignore = true)
     void updateEntityFromRequest(UpdateCandidatoRequest request, @MappingTarget Candidato candidato);
 
-    // === NAMED MAPPINGS ===
-    @Named("mapMembroToBasicInfo")
-    default MembroBasicInfo mapMembroToBasicInfo(Membro membro) {
-        if (membro == null) return null;
-        return MembroBasicInfo.builder()
-                .id(membro.getId())
-                .nome(membro.getNome())
-                .email(membro.getEmail())
-                .cargo(membro.getCargo())
-                .foto(membro.getFoto())
-                .ativo(membro.getAtivo())
-                .build();
-    }
-
-    @Named("mapEleicaoToBasicInfo")
-    default EleicaoBasicInfo mapEleicaoToBasicInfo(Eleicao eleicao) {
-        if (eleicao == null) return null;
-        return EleicaoBasicInfo.builder()
-                .id(eleicao.getId())
-                .nome(eleicao.getNome())
-                .ativa(eleicao.getAtiva())
-                .dataInicio(eleicao.getDataInicio())
-                .dataFim(eleicao.getDataFim())
-                .statusDescricao(eleicao.getStatusDescricao())
-                .build();
-    }
-
-    @Named("mapCargoToBasicInfo")
-    default CargoBasicInfo mapCargoToBasicInfo(Cargo cargo) {
-        if (cargo == null) return null;
-        return CargoBasicInfo.builder()
-                .id(cargo.getId())
-                .nome(cargo.getNome())
-                .maxVotos(cargo.getMaxVotos())
-                .ordemVotacao(cargo.getOrdemVotacao())
-                .obrigatorio(cargo.getObrigatorio())
-                .totalCandidatos(cargo.getTotalCandidatos())
-                .totalVotos(cargo.getTotalVotos())
-                .build();
-    }
-
-    // Basic info mapping
-    default CandidatoBasicInfo toBasicInfo(Candidato candidato) {
-        if (candidato == null) return null;
-        return CandidatoBasicInfo.builder()
-                .id(candidato.getId())
-                .nomeCandidato(candidato.getNomeCandidato())
-                .numeroCandidato(candidato.getNumeroCandidato())
-                .fotoCampanha(candidato.getFotoCampanha())
-                .aprovado(candidato.getAprovado())
-                .totalVotos(candidato.getTotalVotos())
-                .nomeCargoRetendido(candidato.getNomeCargoRetendido())
-                .build();
-    }
+    // === BASIC INFO RESPONSE ===
+    CandidatoBasicInfo toBasicInfo(Candidato candidato);
 }
