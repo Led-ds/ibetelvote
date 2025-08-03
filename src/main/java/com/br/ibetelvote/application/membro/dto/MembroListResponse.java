@@ -17,8 +17,12 @@ public class MembroListResponse {
     private String nome;
     private String email;
     private String cargo;
+    private String departamento;
     private LocalDate dataNascimento;
     private String foto;
+    private String primaryPhone;
     private Boolean ativo;
     private boolean hasUser;
+    private boolean hasPhoto;
+    private String userRole; // Role do usuário associado
 }

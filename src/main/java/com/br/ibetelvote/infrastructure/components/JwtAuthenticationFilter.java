@@ -1,7 +1,7 @@
 package com.br.ibetelvote.infrastructure.components;
 
 import com.br.ibetelvote.infrastructure.jwt.JwtService;
-import com.br.ibetelvote.infrastructure.repositories.UserRepository;
+import com.br.ibetelvote.infrastructure.repositories.UserJpaRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,7 +25,7 @@ import java.util.UUID;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
-    private final UserRepository userRepository;
+    private final UserJpaRepository userJpaRepository;
 
     @Override
     protected void doFilterInternal(
@@ -61,7 +61,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
 
             // Buscar usuário no banco
-            UserDetails userDetails = userRepository.findById(userId)
+            UserDetails userDetails = userJpaRepository.findById(userId)
                     .filter(user -> user.getAtivo())
                     .orElse(null);
 

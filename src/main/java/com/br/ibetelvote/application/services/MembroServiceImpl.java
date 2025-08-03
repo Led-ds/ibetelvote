@@ -1,9 +1,12 @@
 package com.br.ibetelvote.application.services;
 
-import com.br.ibetelvote.application.mapper.MembroMapper;
 import com.br.ibetelvote.application.membro.dto.*;
+import com.br.ibetelvote.application.mapper.MembroMapper;
+import com.br.ibetelvote.application.shared.dto.UploadPhotoResponse;
 import com.br.ibetelvote.domain.entities.Membro;
+import com.br.ibetelvote.domain.entities.User;
 import com.br.ibetelvote.domain.repositories.MembroRepository;
+import com.br.ibetelvote.domain.repositories.UserRepository;
 import com.br.ibetelvote.domain.services.FileStorageService;
 import com.br.ibetelvote.domain.services.MembroService;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -27,11 +31,14 @@ import java.util.UUID;
 public class MembroServiceImpl implements MembroService {
 
     private final MembroRepository membroRepository;
+    private final UserRepository userRepository;
     private final MembroMapper membroMapper;
     private final FileStorageService fileStorageService;
 
+    // === OPERAÇÕES BÁSICAS ===
+
     @Override
-    @CacheEvict(value = {"membros", "membros-stats"}, allEntries = true)
+    @CacheEvict(value = {"membros", "membro-stats"}, allEntries = true)
     public MembroResponse createMembro(CreateMembroRequest request) {
         log.info("Criando novo membro com email: {}", request.getEmail());
 
@@ -40,10 +47,20 @@ public class MembroServiceImpl implements MembroService {
             throw new IllegalArgumentException("Email já cadastrado: " + request.getEmail());
         }
 
+        // Verificar se userId já está associado a outro membro
+        if (request.getUserId() != null && membroRepository.existsByUserId(request.getUserId())) {
+            throw new IllegalArgumentException("Usuário já está associado a outro membro");
+        }
+
+        // Verificar se user existe (se informado)
+        if (request.getUserId() != null && !userRepository.existsById(request.getUserId())) {
+            throw new IllegalArgumentException("Usuário não encontrado com ID: " + request.getUserId());
+        }
+
         Membro membro = membroMapper.toEntity(request);
         Membro savedMembro = membroRepository.save(membro);
 
-        log.info("Membro criado com sucesso - ID: {}", savedMembro.getId());
+        log.info("Membro criado com sucesso - ID: {}, Nome: {}", savedMembro.getId(), savedMembro.getNome());
         return membroMapper.toResponse(savedMembro);
     }
 
@@ -78,22 +95,20 @@ public class MembroServiceImpl implements MembroService {
 
         Pageable pageable = createPageable(filter);
 
-        Page<Membro> membrosPage;
-
-        if (hasFilters(filter)) {
-            // Usando query customizada com filtros
-            membrosPage = ((com.br.ibetelvote.infrastructure.repositories.MembroJpaRepository) membroRepository)
-                    .findByFilters(filter.getNome(), filter.getEmail(), filter.getAtivo(), pageable);
-        } else {
-            // Busca sem filtros
-            membrosPage = membroRepository.findAll(pageable);
-        }
+        Page<Membro> membrosPage = membroRepository.findByFilters(
+                filter.getNome(),
+                filter.getEmail(),
+                filter.getCargo(),
+                filter.getAtivo(),
+                filter.getHasUser(),
+                pageable
+        );
 
         return membrosPage.map(membroMapper::toListResponse);
     }
 
     @Override
-    @CacheEvict(value = {"membros", "membros-stats"}, allEntries = true)
+    @CacheEvict(value = {"membros", "membro-stats"}, allEntries = true)
     public MembroResponse updateMembro(UUID id, UpdateMembroRequest request) {
         log.info("Atualizando membro ID: {}", id);
 
@@ -103,25 +118,35 @@ public class MembroServiceImpl implements MembroService {
         membroMapper.updateEntityFromRequest(request, membro);
         Membro updatedMembro = membroRepository.save(membro);
 
-        log.info("Membro atualizado com sucesso - ID: {}", updatedMembro.getId());
+        log.info("Membro atualizado com sucesso - ID: {}, Nome: {}", updatedMembro.getId(), updatedMembro.getNome());
         return membroMapper.toResponse(updatedMembro);
     }
 
     @Override
-    @CacheEvict(value = {"membros", "membros-stats"}, allEntries = true)
+    @CacheEvict(value = {"membros", "membro-stats"}, allEntries = true)
     public void deleteMembro(UUID id) {
         log.info("Removendo membro ID: {}", id);
 
-        if (!membroRepository.findById(id).isPresent()) {
-            throw new IllegalArgumentException("Membro não encontrado com ID: " + id);
+        Membro membro = membroRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Membro não encontrado com ID: " + id));
+
+        // Remover foto se existir
+        if (membro.hasPhoto()) {
+            try {
+                fileStorageService.deleteFile(membro.getFoto().replace("/api/v1/files/", ""));
+            } catch (Exception e) {
+                log.warn("Erro ao remover foto do membro {}: {}", id, e.getMessage());
+            }
         }
 
         membroRepository.deleteById(id);
         log.info("Membro removido com sucesso - ID: {}", id);
     }
 
+    // === OPERAÇÕES DE CONTROLE ===
+
     @Override
-    @CacheEvict(value = {"membros", "membros-stats"}, allEntries = true)
+    @CacheEvict(value = {"membros", "membro-stats"}, allEntries = true)
     public void activateMembro(UUID id) {
         log.info("Ativando membro ID: {}", id);
 
@@ -135,7 +160,7 @@ public class MembroServiceImpl implements MembroService {
     }
 
     @Override
-    @CacheEvict(value = {"membros", "membros-stats"}, allEntries = true)
+    @CacheEvict(value = {"membros", "membro-stats"}, allEntries = true)
     public void deactivateMembro(UUID id) {
         log.info("Desativando membro ID: {}", id);
 
@@ -148,6 +173,52 @@ public class MembroServiceImpl implements MembroService {
         log.info("Membro desativado com sucesso - ID: {}", id);
     }
 
+    // === OPERAÇÕES DE ASSOCIAÇÃO ===
+
+    @Override
+    @CacheEvict(value = {"membros", "membro-stats"}, allEntries = true)
+    public void associateUser(UUID membroId, AssociateUserRequest request) {
+        log.info("Associando usuário {} ao membro {}", request.getUserId(), membroId);
+
+        Membro membro = membroRepository.findById(membroId)
+                .orElseThrow(() -> new IllegalArgumentException("Membro não encontrado com ID: " + membroId));
+
+        // Verificar se user existe
+        User user = userRepository.findById(request.getUserId())
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado com ID: " + request.getUserId()));
+
+        // Verificar se user já está associado a outro membro
+        if (membroRepository.existsByUserId(request.getUserId())) {
+            throw new IllegalArgumentException("Usuário já está associado a outro membro");
+        }
+
+        membro.associateUser(request.getUserId());
+        membroRepository.save(membro);
+
+        log.info("Usuário associado com sucesso - Membro: {}, User: {}", membroId, request.getUserId());
+    }
+
+    @Override
+    @CacheEvict(value = {"membros", "membro-stats"}, allEntries = true)
+    public void dissociateUser(UUID membroId) {
+        log.info("Desassociando usuário do membro {}", membroId);
+
+        Membro membro = membroRepository.findById(membroId)
+                .orElseThrow(() -> new IllegalArgumentException("Membro não encontrado com ID: " + membroId));
+
+        if (!membro.hasUser()) {
+            throw new IllegalArgumentException("Membro não possui usuário associado");
+        }
+
+        UUID oldUserId = membro.getUserId();
+        membro.dissociateUser();
+        membroRepository.save(membro);
+
+        log.info("Usuário desassociado com sucesso - Membro: {}, Ex-User: {}", membroId, oldUserId);
+    }
+
+    // === OPERAÇÕES DE FOTO ===
+
     @Override
     @CacheEvict(value = "membros", key = "#id")
     public UploadPhotoResponse uploadPhoto(UUID id, MultipartFile file) {
@@ -157,6 +228,11 @@ public class MembroServiceImpl implements MembroService {
                 .orElseThrow(() -> new IllegalArgumentException("Membro não encontrado com ID: " + id));
 
         try {
+            // Remover foto anterior se existir
+            if (membro.hasPhoto()) {
+                fileStorageService.deleteFile(membro.getFoto().replace("/api/v1/files/", ""));
+            }
+
             String fileName = fileStorageService.storeFile(file, "membros/fotos");
             String fileUrl = "/api/v1/files/" + fileName;
 
@@ -178,29 +254,91 @@ public class MembroServiceImpl implements MembroService {
     }
 
     @Override
-    @Cacheable(value = "membros-stats", key = "'total'")
+    @CacheEvict(value = "membros", key = "#id")
+    public void removePhoto(UUID id) {
+        log.info("Removendo foto do membro ID: {}", id);
+
+        Membro membro = membroRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Membro não encontrado com ID: " + id));
+
+        if (membro.hasPhoto()) {
+            fileStorageService.deleteFile(membro.getFoto().replace("/api/v1/files/", ""));
+            membro.removePhoto();
+            membroRepository.save(membro);
+
+            log.info("Foto removida com sucesso - ID: {}", id);
+        }
+    }
+
+    // === CONSULTAS ESPECÍFICAS ===
+
+    @Override
+    @Cacheable(value = "membros-without-user")
+    @Transactional(readOnly = true)
+    public List<MembroListResponse> getMembrosWithoutUser() {
+        List<Membro> membros = membroRepository.findByUserIdIsNull();
+        return membroMapper.toListResponseList(membros);
+    }
+
+    @Override
+    @Cacheable(value = "membros-with-user")
+    @Transactional(readOnly = true)
+    public List<MembroListResponse> getMembrosWithUser() {
+        List<Membro> membros = membroRepository.findByUserIdIsNotNull();
+        return membroMapper.toListResponseList(membros);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MembroListResponse> getMembrosWithoutPhoto() {
+        List<Membro> membros = membroRepository.findByFotoIsNull();
+        return membroMapper.toListResponseList(membros);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MembroListResponse> getMembrosWithIncompleteProfile() {
+        List<Membro> membros = membroRepository.findMembrosWithIncompleteProfile();
+        return membroMapper.toListResponseList(membros);
+    }
+
+    // === ESTATÍSTICAS ===
+
+    @Override
+    @Cacheable(value = "membro-stats", key = "'total'")
     @Transactional(readOnly = true)
     public long getTotalMembros() {
         return membroRepository.count();
     }
 
     @Override
-    @Cacheable(value = "membros-stats", key = "'total-ativos'")
+    @Cacheable(value = "membro-stats", key = "'total-ativos'")
     @Transactional(readOnly = true)
     public long getTotalMembrosAtivos() {
         return membroRepository.countByAtivoTrue();
     }
 
-    // Métodos auxiliares
+    @Override
+    @Cacheable(value = "membro-stats", key = "'total-with-user'")
+    @Transactional(readOnly = true)
+    public long getTotalMembrosWithUser() {
+        return membroRepository.findByUserIdIsNotNull().size();
+    }
+
+    @Override
+    @Cacheable(value = "membro-stats", key = "'total-without-user'")
+    @Transactional(readOnly = true)
+    public long getTotalMembrosWithoutUser() {
+        return membroRepository.findByUserIdIsNull().size();
+    }
+
+    // === MÉTODOS AUXILIARES ===
+
     private Pageable createPageable(MembroFilterRequest filter) {
         Sort sort = Sort.by(
                 "desc".equalsIgnoreCase(filter.getDirection()) ? Sort.Direction.DESC : Sort.Direction.ASC,
                 filter.getSort()
         );
         return PageRequest.of(filter.getPage(), filter.getSize(), sort);
-    }
-
-    private boolean hasFilters(MembroFilterRequest filter) {
-        return filter.getNome() != null || filter.getEmail() != null || filter.getAtivo() != null;
     }
 }

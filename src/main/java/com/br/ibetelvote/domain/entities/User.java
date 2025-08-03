@@ -12,7 +12,6 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -30,15 +29,13 @@ import java.util.UUID;
 @Builder
 @EqualsAndHashCode(of = "id")
 public class User implements UserDetails {
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
-    @NotBlank(message = "Nome é obrigatório")
-    @Column(name = "nome", nullable = false, length = 100)
-    private String nome;
-
+    // === CAMPOS DE AUTENTICAÇÃO ===
     @Email(message = "Email deve ser válido")
     @NotBlank(message = "Email é obrigatório")
     @Column(name = "email", nullable = false, unique = true, length = 150)
@@ -53,15 +50,7 @@ public class User implements UserDetails {
     @Column(name = "role", nullable = false, length = 20)
     private UserRole role;
 
-    @Column(name = "foto", length = 500)
-    private String foto;
-
-    @Column(name = "cargo", length = 100)
-    private String cargo;
-
-    @Column(name = "data_nascimento")
-    private LocalDate dataNascimento;
-
+    // === CAMPOS DE CONTROLE DE CONTA ===
     @Builder.Default
     @Column(name = "ativo", nullable = false)
     private Boolean ativo = true;
@@ -78,6 +67,7 @@ public class User implements UserDetails {
     @Column(name = "credentials_non_expired", nullable = false)
     private Boolean credentialsNonExpired = true;
 
+    // === CAMPOS DE AUDITORIA ===
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -86,7 +76,11 @@ public class User implements UserDetails {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    // UserDetails implementation
+    // === RELACIONAMENTO COM MEMBRO ===
+    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    private Membro membro;
+
+    // === IMPLEMENTAÇÃO UserDetails ===
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
@@ -117,7 +111,7 @@ public class User implements UserDetails {
         return ativo;
     }
 
-    // Business Methods
+    // === MÉTODOS DE NEGÓCIO - CONTROLE DE CONTA ===
     public void activate() {
         this.ativo = true;
     }
@@ -126,16 +120,27 @@ public class User implements UserDetails {
         this.ativo = false;
     }
 
-    public void updateProfile(String nome, String cargo, LocalDate dataNascimento) {
-        this.nome = nome;
-        this.cargo = cargo;
-        this.dataNascimento = dataNascimento;
+    public void lockAccount() {
+        this.accountNonLocked = false;
     }
 
-    public void updatePhoto(String foto) {
-        this.foto = foto;
+    public void unlockAccount() {
+        this.accountNonLocked = true;
     }
 
+    public void expireAccount() {
+        this.accountNonExpired = false;
+    }
+
+    public void expireCredentials() {
+        this.credentialsNonExpired = false;
+    }
+
+    public void updatePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
+
+    // === MÉTODOS DE NEGÓCIO - ROLES ===
     public boolean hasRole(UserRole role) {
         return this.role == role;
     }
@@ -150,5 +155,59 @@ public class User implements UserDetails {
 
     public boolean isMember() {
         return hasRole(UserRole.MEMBRO);
+    }
+
+    public void promoteToAdmin() {
+        this.role = UserRole.ADMINISTRADOR;
+    }
+
+    public void promoteToProUser() {
+        this.role = UserRole.UTILIZADOR_PRO;
+    }
+
+    public void demoteToMember() {
+        this.role = UserRole.MEMBRO;
+    }
+
+    public void changeRole(UserRole newRole) {
+        this.role = newRole;
+    }
+
+    // === MÉTODOS UTILITÁRIOS ===
+    public boolean isActive() {
+        return this.ativo;
+    }
+
+    public boolean hasMembro() {
+        return this.membro != null;
+    }
+
+    public String getDisplayName() {
+        return hasMembro() ? membro.getNome() : email;
+    }
+
+    public String getFormattedRole() {
+        return switch (this.role) {
+            case ADMINISTRADOR -> "Administrador";
+            case UTILIZADOR_PRO -> "Utilizador Pro";
+            case MEMBRO -> "Membro";
+        };
+    }
+
+    // === MÉTODOS DE CONVENIÊNCIA PARA DADOS DO MEMBRO ===
+    public String getNome() {
+        return hasMembro() ? membro.getNome() : null;
+    }
+
+    public String getFoto() {
+        return hasMembro() ? membro.getFoto() : null;
+    }
+
+    public String getPhotoUrl() {
+        return hasMembro() ? membro.getPhotoUrl() : getDefaultPhotoUrl();
+    }
+
+    private String getDefaultPhotoUrl() {
+        return "/api/v1/files/default-avatar.png";
     }
 }
