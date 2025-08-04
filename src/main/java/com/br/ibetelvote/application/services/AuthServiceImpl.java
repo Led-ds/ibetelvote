@@ -37,6 +37,10 @@ public class AuthServiceImpl implements AuthService {
     public LoginResponse login(LoginRequest request) {
         log.info("Tentativa de login para email: {}", request.email());
 
+        log.info("DEBUG - Senha recebida: '{}' (tamanho: {})",
+                request.password(),
+                request.password().length());
+
         try {
             // A chamada ao authenticationManager já valida a senha com o BCrypt
             // e verifica se o usuário existe e está ativo.
