@@ -1,5 +1,6 @@
 package com.br.ibetelvote.infrastructure.service;
 
+import com.br.ibetelvote.domain.entities.User;
 import com.br.ibetelvote.infrastructure.auth.CustomUserDetails;
 import com.br.ibetelvote.infrastructure.repositories.UserJpaRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,11 +23,18 @@ public class CustomUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         log.debug("Carregando usuário por email: {}", username);
 
-        return userJpaRepository.findByEmail(username)
-                .map(CustomUserDetails::new) // adaptador aqui!
+        User user = userJpaRepository.findByEmail(username)
                 .orElseThrow(() -> {
                     log.warn("Usuário não encontrado: {}", username);
                     return new UsernameNotFoundException("Usuário não encontrado: " + username);
                 });
+
+        // ✅ ADICIONE ESTE LOG TEMPORÁRIO
+        log.info("DEBUG - Usuário encontrado: {} | Hash: {} | Ativo: {}",
+                user.getEmail(),
+                user.getPassword().substring(0, 10) + "...",
+                user.isEnabled());
+
+        return user;
     }
 }
