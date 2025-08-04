@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -61,7 +62,8 @@ public class UserServiceImpl implements UserService {
             throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
         }
 
-        User user = userRepository.findByUser(id);
+        Optional<User> userOpt = userRepository.findById(id);
+        User user = userOpt.orElse(null);
 
         return userMapper.toResponse(user);
     }
@@ -102,7 +104,8 @@ public class UserServiceImpl implements UserService {
             throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
         }
 
-        User user = userRepository.findByUser(id);
+        Optional<User> userOpt = userRepository.findById(id);
+        User user = userOpt.orElse(null);
 
         userRepository.delete(user);
         log.info("Usuário removido com sucesso - ID: {}", id);
@@ -119,7 +122,8 @@ public class UserServiceImpl implements UserService {
             throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
         }
 
-        User user = userRepository.findByUser(id);
+        Optional<User> userOpt = userRepository.findById(id);
+        User user = userOpt.orElse(null);
 
         user.activate();
         userRepository.save(user);
@@ -136,7 +140,8 @@ public class UserServiceImpl implements UserService {
             throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
         }
 
-        User user = userRepository.findByUser(id);
+        Optional<User> userOpt = userRepository.findById(id);
+        User user = userOpt.orElse(null);
 
         user.deactivate();
         userRepository.save(user);
@@ -153,7 +158,8 @@ public class UserServiceImpl implements UserService {
             throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
         }
 
-        User user = userRepository.findByUser(id);
+        Optional<User> userOpt = userRepository.findById(id);
+        User user = userOpt.orElse(null);
 
         user.lockAccount();
         userRepository.save(user);
@@ -170,7 +176,8 @@ public class UserServiceImpl implements UserService {
             throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
         }
 
-        User user = userRepository.findByUser(id);
+        Optional<User> userOpt = userRepository.findById(id);
+        User user = userOpt.orElse(null);
 
         user.unlockAccount();
         userRepository.save(user);
@@ -189,7 +196,8 @@ public class UserServiceImpl implements UserService {
             throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
         }
 
-        User user = userRepository.findByUser(id);
+        Optional<User> userOpt = userRepository.findById(id);
+        User user = userOpt.orElse(null);
 
         UserRole oldRole = user.getRole();
         user.changeRole(request.getNewRole());
@@ -225,7 +233,8 @@ public class UserServiceImpl implements UserService {
             throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
         }
 
-        User user = userRepository.findByUser(id);
+        Optional<User> userOpt = userRepository.findById(id);
+        User user = userOpt.orElse(null);
 
         // Validar senha atual
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
@@ -247,7 +256,8 @@ public class UserServiceImpl implements UserService {
             throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
         }
 
-        User user = userRepository.findByUser(id);
+        Optional<User> userOpt = userRepository.findById(id);
+        User user = userOpt.orElse(null);
 
         user.updatePassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);

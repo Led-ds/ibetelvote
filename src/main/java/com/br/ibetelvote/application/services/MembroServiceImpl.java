@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -190,7 +191,8 @@ public class MembroServiceImpl implements MembroService {
             throw new IllegalArgumentException("Usuário não encontrado com ID: " + request.getUserId());
         }
 
-        User user = userRepository.findByUser(request.getUserId());
+        Optional<User> userOpt = userRepository.findById(request.getUserId() );
+        User user = userOpt.orElse(null);
 
         if (membroRepository.existsByUserId(user.getId())) {
             throw new IllegalArgumentException("Usuário já está associado a outro membro");
