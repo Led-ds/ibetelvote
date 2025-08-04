@@ -56,5 +56,4 @@ public interface UserJpaRepository extends JpaRepository<User, UUID>, UserReposi
 
     Optional<User> findById(UUID id);
 
-    User findByUser(UUID id);
 }
