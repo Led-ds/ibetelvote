@@ -65,14 +65,16 @@ public interface MembroJpaRepository extends JpaRepository<Membro, UUID>, Membro
     List<Membro> findMembrosWithIncompleteProfile();
 
     @Override
-    @Query("SELECT m FROM Membro m WHERE " +
-            "(:nome IS NULL OR UPPER(m.nome) LIKE UPPER(CONCAT('%', :nome, '%'))) AND " +
-            "(:email IS NULL OR UPPER(m.email) LIKE UPPER(CONCAT('%', :email, '%'))) AND " +
-            "(:cargo IS NULL OR UPPER(m.cargo) LIKE UPPER(CONCAT('%', :cargo, '%'))) AND " +
+    @Query(value = "SELECT * FROM membros m WHERE " +
+            "(:nome IS NULL OR LOWER(m.nome) LIKE LOWER(CONCAT('%', :nome, '%'))) AND " +
+            "(:email IS NULL OR LOWER(m.email) LIKE LOWER(CONCAT('%', :email, '%'))) AND " +
+            "(:cargo IS NULL OR LOWER(m.cargo) LIKE LOWER(CONCAT('%', :cargo, '%'))) AND " +
             "(:ativo IS NULL OR m.ativo = :ativo) AND " +
             "(:hasUser IS NULL OR " +
-            "  (:hasUser = true AND m.userId IS NOT NULL) OR " +
-            "  (:hasUser = false AND m.userId IS NULL))")
+            "  (:hasUser = true AND m.user_id IS NOT NULL) OR " +
+            "  (:hasUser = false AND m.user_id IS NULL)) " +
+            "ORDER BY m.nome",
+            nativeQuery = true)
     Page<Membro> findByFilters(@Param("nome") String nome,
                                @Param("email") String email,
                                @Param("cargo") String cargo,

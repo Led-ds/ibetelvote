@@ -51,6 +51,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/validate").permitAll()
 
+                        // Debug endpoints (remover em produção)
+                        .requestMatchers("/debug/**").permitAll()
+
                         // Documentação e ferramentas de desenvolvimento
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/h2-console/**").permitAll() // Permite acesso ao H2 console em dev
@@ -60,47 +63,68 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").permitAll()
 
                         // Arquivos estáticos
-                        .requestMatchers(HttpMethod.GET, "/files/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/files/**").permitAll()
 
                         // Endpoints de autenticação autorizados
                         .requestMatchers("/api/v1/auth/me", "/api/v1/auth/logout").authenticated()
 
-                        // Membros - acesso baseado em roles
-                        .requestMatchers(HttpMethod.GET, "/api/v1/membros").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        // === ELEIÇÕES - ORDEM IMPORTA! ===
+                        // Endpoints específicos primeiro (mais restritivos)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/eleicoes/ativa").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/eleicoes/abertas").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/eleicoes/encerradas").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/eleicoes/futuras").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/eleicoes/recentes").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/eleicoes/*/can-activate").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/eleicoes/*/is-open").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/eleicoes/stats/**").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+
+                        // Operações de controle
+                        .requestMatchers(HttpMethod.POST, "/api/v1/eleicoes/*/ativar").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/eleicoes/*/desativar").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/eleicoes/*/encerrar").hasRole("ADMINISTRADOR")
+
+                        // CRUD básico
+                        .requestMatchers(HttpMethod.GET, "/api/v1/eleicoes/*").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/eleicoes").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/eleicoes").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/eleicoes/**").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/eleicoes/**").hasRole("ADMINISTRADOR")
+
+                        // === MEMBROS ===
+                        .requestMatchers(HttpMethod.GET, "/api/v1/membros/**").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/membros").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
                         .requestMatchers(HttpMethod.POST, "/api/v1/membros").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/membros/**").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/membros/**").hasRole("ADMINISTRADOR")
                         .requestMatchers(HttpMethod.POST, "/api/v1/membros/*/foto").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
 
-                        // Eleições - acesso baseado em roles
-                        .requestMatchers(HttpMethod.GET, "/api/v1/eleicoes").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/eleicoes").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/eleicoes/**").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/eleicoes/*/ativar").hasRole("ADMINISTRADOR")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/eleicoes/*/encerrar").hasRole("ADMINISTRADOR")
-
-                        // Cargos
-                        .requestMatchers(HttpMethod.GET, "/api/v1/eleicoes/*/cargos").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/eleicoes/*/cargos").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+                        // === CARGOS ===
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cargos/**").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cargos").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/cargos").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/cargos/**").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/cargos/**").hasRole("ADMINISTRADOR")
 
-                        // Candidatos
-                        .requestMatchers(HttpMethod.GET, "/api/v1/eleicoes/*/candidatos").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/eleicoes/*/candidatos").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+                        // === CANDIDATOS ===
+                        .requestMatchers(HttpMethod.GET, "/api/v1/candidatos/**").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/candidatos").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/candidatos").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/candidatos/**").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/candidatos/**").hasRole("ADMINISTRADOR")
 
-                        // Votação
-                        .requestMatchers(HttpMethod.GET, "/api/v1/eleicoes/*/votacao").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
-                        .requestMatchers(HttpMethod.POST, "/api/v1/eleicoes/*/votar").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
-                        .requestMatchers(HttpMethod.GET, "/api/v1/eleicoes/*/progresso").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+                        // === VOTAÇÃO ===
+                        .requestMatchers(HttpMethod.GET, "/api/v1/votos/**").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/votos/votar").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/votos/validar").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
 
-                        // Resultados
-                        .requestMatchers(HttpMethod.GET, "/api/v1/eleicoes/*/resultados").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
-                        .requestMatchers(HttpMethod.GET, "/api/v1/eleicoes/historico").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+                        // === USUÁRIOS ===
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users/**").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/users/**").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/users/**").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/users/**").hasRole("ADMINISTRADOR")
 
-                        // Upload de arquivos
+                        // === UPLOAD DE ARQUIVOS ===
                         .requestMatchers(HttpMethod.POST, "/api/v1/upload/**").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
 
                         // Qualquer outra requisição deve ser autenticada
@@ -155,11 +179,10 @@ public class SecurityConfig {
 
     /**
      * Define o bean para o PasswordEncoder, utilizando BCrypt.
-     * O custo de 12 é um bom balanço entre segurança e performance.
      * @return Uma instância de PasswordEncoder.
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        return new BCryptPasswordEncoder(); // ✅ Força padrão (10) - CORRIGIDO
     }
 }
