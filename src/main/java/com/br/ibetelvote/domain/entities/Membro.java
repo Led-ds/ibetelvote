@@ -36,6 +36,10 @@ public class Membro {
     @Column(name = "nome", nullable = false, length = 100)
     private String nome;
 
+    @NotBlank(message = "CPF é obrigatório")
+    @Column(name = "cpf", nullable = false, unique = true, length = 14)
+    private String cpf;
+
     @Email(message = "Email deve ser válido")
     @NotBlank(message = "Email é obrigatório")
     @Column(name = "email", nullable = false, unique = true, length = 150)
@@ -114,10 +118,27 @@ public class Membro {
         this.ativo = false;
     }
 
-    public void updateBasicProfile(String nome, String email, LocalDate dataNascimento) {
+    public void updateCompleteProfile(String telefone, String celular, String endereco,
+                                      String cidade, String estado, String cep,
+                                      String cargo, String departamento,
+                                      LocalDate dataBatismo, LocalDate dataMembroDesde) {
+        this.telefone = telefone;
+        this.celular = celular;
+        this.endereco = endereco;
+        this.cidade = cidade;
+        this.estado = estado;
+        this.cep = cep;
+        this.cargo = cargo;
+        this.departamento = departamento;
+        this.dataBatismo = dataBatismo;
+        this.dataMembroDesde = dataMembroDesde;
+    }
+
+    public void updateBasicProfile(String nome, String email, LocalDate dataNascimento, String cpf) {
         this.nome = nome;
         this.email = email;
         this.dataNascimento = dataNascimento;
+        this.cpf = cpf;
     }
 
     public void updateChurchInfo(String cargo, String departamento, LocalDate dataBatismo, LocalDate dataMembroDesde) {
@@ -142,6 +163,13 @@ public class Membro {
 
     public void removePhoto() {
         this.foto = null;
+    }
+
+    public boolean canCreateUser() {
+        return this.ativo &&
+                this.cpf != null && !this.cpf.trim().isEmpty() &&
+                this.email != null && !this.email.trim().isEmpty() &&
+                this.userId == null;
     }
 
     public void associateUser(UUID userId) {
@@ -188,12 +216,19 @@ public class Membro {
                 (this.celular != null && !this.celular.trim().isEmpty());
     }
 
-    public boolean isProfileComplete() {
+    public boolean isBasicProfileComplete() {
         return this.nome != null && !this.nome.trim().isEmpty() &&
                 this.email != null && !this.email.trim().isEmpty() &&
+                this.cpf != null && !this.cpf.trim().isEmpty() &&
                 this.dataNascimento != null &&
                 this.cargo != null && !this.cargo.trim().isEmpty() &&
                 hasContactInfo();
+    }
+
+    public boolean isFullProfileComplete() {
+        return isBasicProfileComplete() &&
+                hasContactInfo() &&
+                hasCompleteAddress();
     }
 
     public String getPrimaryPhone() {
@@ -245,5 +280,43 @@ public class Membro {
             return true; // CEP is optional
         }
         return this.cep.matches("^\\d{5}-?\\d{3}$");
+    }
+
+    public static boolean isValidCPF(String cpf) {
+        if (cpf == null) return false;
+
+        // Remove caracteres especiais
+        cpf = cpf.replaceAll("[^0-9]", "");
+
+        // Verifica se tem 11 dígitos
+        if (cpf.length() != 11) return false;
+
+        // Verifica se todos os dígitos são iguais
+        if (cpf.matches("(\\d)\\1{10}")) return false;
+
+        // Validação dos dígitos verificadores (algoritmo CPF)
+        try {
+            int[] digits = cpf.chars().map(c -> c - '0').toArray();
+
+            // Primeiro dígito verificador
+            int sum1 = 0;
+            for (int i = 0; i < 9; i++) {
+                sum1 += digits[i] * (10 - i);
+            }
+            int digit1 = 11 - (sum1 % 11);
+            if (digit1 >= 10) digit1 = 0;
+
+            // Segundo dígito verificador
+            int sum2 = 0;
+            for (int i = 0; i < 10; i++) {
+                sum2 += digits[i] * (11 - i);
+            }
+            int digit2 = 11 - (sum2 % 11);
+            if (digit2 >= 10) digit2 = 0;
+
+            return digits[9] == digit1 && digits[10] == digit2;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }
