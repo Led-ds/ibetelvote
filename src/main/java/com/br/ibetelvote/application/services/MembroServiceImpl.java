@@ -70,16 +70,12 @@ public class MembroServiceImpl implements MembroService {
     @Transactional(readOnly = true)
     public MembroResponse getMembroById(UUID id) {
         log.debug("Buscando membro por ID: {}", id);
-        Membro membro = null;
 
-        // Verificar se membro existe
-        if (!membroRepository.existsById(id)) {
-            throw new IllegalArgumentException("Membro não encontrado com ID: " + id);
-        }
+        Membro membro = membroRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Membro não encontrado com ID: " + id));
 
-        return membroMapper.toResponse(membroRepository.save(id));
+        return membroMapper.toResponse(membro);
     }
-
     @Override
     @Cacheable(value = "membros", key = "#email")
     @Transactional(readOnly = true)
