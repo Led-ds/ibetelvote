@@ -27,7 +27,7 @@ public interface MembroService {
     void dissociateUser(UUID membroId);
 
     // === OPERAÇÕES DE FOTO ===
-    UploadPhotoResponse uploadPhoto(UUID id, MultipartFile file);
+    UploadPhotoResponse uploadPhoto(UUID userId, MultipartFile file);
     void removePhoto(UUID id);
 
     // === CONSULTAS ESPECÍFICAS ===

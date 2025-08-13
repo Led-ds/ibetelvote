@@ -226,12 +226,12 @@ public class MembroServiceImpl implements MembroService {
     // === OPERAÇÕES DE FOTO ===
 
     @Override
-    @CacheEvict(value = "membros", key = "#id")
-    public UploadPhotoResponse uploadPhoto(UUID id, MultipartFile file) {
-        log.info("Fazendo upload de foto para membro ID: {}", id);
+    @CacheEvict(value = "membros", key = "#userId")
+    public UploadPhotoResponse uploadPhoto(UUID userId, MultipartFile file) {
+        log.info("Fazendo upload de foto para membro ID: {}", userId);
 
-        Membro membro = membroRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Membro não encontrado com ID: " + id));
+        Membro membro = membroRepository.findByUserId(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Membro não encontrado com ID: " + userId));
 
         try {
             // Remover foto anterior se existir
@@ -245,7 +245,7 @@ public class MembroServiceImpl implements MembroService {
             membro.updatePhoto(fileUrl);
             membroRepository.save(membro);
 
-            log.info("Upload de foto concluído para membro ID: {} - Arquivo: {}", id, fileName);
+            log.info("Upload de foto concluído para membro ID: {} - Arquivo: {}", userId, fileName);
 
             return UploadPhotoResponse.builder()
                     .fileName(fileName)
@@ -254,7 +254,7 @@ public class MembroServiceImpl implements MembroService {
                     .build();
 
         } catch (Exception e) {
-            log.error("Erro ao fazer upload de foto para membro ID: {}", id, e);
+            log.error("Erro ao fazer upload de foto para membro ID: {}", userId, e);
             throw new RuntimeException("Erro ao fazer upload da foto: " + e.getMessage());
         }
     }

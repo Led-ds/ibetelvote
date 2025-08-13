@@ -232,7 +232,7 @@ public class VotoController {
     }
 
     @GetMapping("/eleicao/{eleicaoId}/progresso")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO', 'MEMBRO')")
     @Operation(summary = "Progresso da votação", description = "Retorna o progresso de votação por hora")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Progresso retornado com sucesso"),
