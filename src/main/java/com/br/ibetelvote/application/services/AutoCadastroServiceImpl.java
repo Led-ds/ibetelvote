@@ -44,11 +44,6 @@ public class AutoCadastroServiceImpl implements AutoCadastroService {
         Membro membro = membroRepository.findByEmailAndCpf(request.getEmail(), request.getCpf())
                 .orElseThrow(() -> new IllegalArgumentException("Membro não encontrado com os dados informados"));
 
-        // Verificar se dados conferem
-        if (!membro.getNome().equalsIgnoreCase(request.getNome().trim())) {
-            throw new IllegalArgumentException("Nome não confere com os dados cadastrados");
-        }
-
         // Verificar se pode criar usuário
         if (!membro.canCreateUser()) {
             String motivo = !membro.isActive() ? "Membro não está ativo" : "Membro já possui usuário cadastrado";

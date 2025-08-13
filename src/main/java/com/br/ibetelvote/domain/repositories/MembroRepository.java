@@ -9,7 +9,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface MembroRepository {
-    Membro save(UUID membro);
+
     Optional<Membro> findByEmail(String email);
     Optional<Membro> findByUserId(UUID userId);
     Page<Membro> findAll(Pageable pageable);
@@ -37,4 +37,27 @@ public interface MembroRepository {
 
     // Consultas com filtros dinâmicos
     Page<Membro> findByFilters(String nome, String email, String cargo, Boolean ativo, Boolean hasUser, Pageable pageable);
+
+    // ✅ NOVOS MÉTODOS PARA AUTO-CADASTRO
+
+    /**
+     * Busca um membro pelo email E CPF (ambos devem coincidir)
+     * Usado para validação no auto-cadastro
+     */
+    Optional<Membro> findByEmailAndCpf(String email, String cpf);
+
+    /**
+     * Busca membro por CPF
+     */
+    Optional<Membro> findByCpf(String cpf);
+
+    /**
+     * Verifica se já existe um membro com o CPF informado
+     */
+    boolean existsByCpf(String cpf);
+
+    /**
+     * Verifica se existe membro com CPF diferente do ID informado
+     */
+    boolean existsByCpfAndIdNot(String cpf, UUID id);
 }

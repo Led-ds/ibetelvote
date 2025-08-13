@@ -89,5 +89,30 @@ public interface MembroJpaRepository extends JpaRepository<Membro, UUID>, Membro
     @Query("SELECT m FROM Membro m LEFT JOIN FETCH m.user WHERE m.email = :email")
     Optional<Membro> findByEmailWithUser(@Param("email") String email);
 
+    // ✅ MÉTODO FALTANTE ADICIONADO
+    /**
+     * Busca um membro pelo email E CPF (ambos devem coincidir)
+     * Usado para validação no auto-cadastro
+     */
+    @Query("SELECT m FROM Membro m WHERE m.email = :email AND m.cpf = :cpf")
+    Optional<Membro> findByEmailAndCpf(@Param("email") String email, @Param("cpf") String cpf);
+
+    // ✅ MÉTODOS ADICIONAIS ÚTEIS PARA AUTO-CADASTRO
+
+    /**
+     * Busca membro por CPF
+     */
+    Optional<Membro> findByCpf(String cpf);
+
+    /**
+     * Verifica se já existe um membro com o CPF informado
+     */
+    boolean existsByCpf(String cpf);
+
+    /**
+     * Verifica se existe membro com CPF diferente do ID informado
+     */
+    boolean existsByCpfAndIdNot(String cpf, UUID id);
+
     boolean existsById(UUID id);
 }
