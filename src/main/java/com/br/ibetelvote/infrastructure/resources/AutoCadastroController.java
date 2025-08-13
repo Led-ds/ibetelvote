@@ -163,10 +163,10 @@ public class AutoCadastroController {
             @ApiResponse(responseCode = "404", description = "Membro não encontrado")
     })
     public ResponseEntity<MembroProfileResponse> obterMeuPerfil(Authentication authentication) {
-        UUID membroId = extrairMembroIdDoToken(authentication);
-        log.info("Obtendo perfil do membro: {}", membroId);
+        UUID userId = extrairMembroIdDoToken(authentication);
+        log.info("Obtendo perfil do membro: {}", userId);
 
-        MembroProfileResponse response = autoCadastroService.getMembroProfile(membroId);
+        MembroProfileResponse response = autoCadastroService.getMembroProfile(userId);
         return ResponseEntity.ok(response);
     }
 
@@ -190,10 +190,10 @@ public class AutoCadastroController {
             @Valid @RequestBody UpdateMembroProfileRequest request,
             Authentication authentication) {
 
-        UUID membroId = extrairMembroIdDoToken(authentication);
-        log.info("Atualizando perfil do membro: {}", membroId);
+        UUID userId = extrairMembroIdDoToken(authentication);
+        log.info("Atualizando perfil do membro: {}", userId);
 
-        MembroProfileResponse response = autoCadastroService.updateMembroProfile(membroId, request);
+        MembroProfileResponse response = autoCadastroService.updateMembroProfile(userId, request);
         return ResponseEntity.ok(response);
     }
 
@@ -219,11 +219,11 @@ public class AutoCadastroController {
             @RequestParam("file") MultipartFile file,
             Authentication authentication) {
 
-        UUID membroId = extrairMembroIdDoToken(authentication);
+        UUID userId = extrairMembroIdDoToken(authentication);
         log.info("Upload de foto para membro: {}, arquivo: {}, tamanho: {} bytes",
-                membroId, file.getOriginalFilename(), file.getSize());
+                userId, file.getOriginalFilename(), file.getSize());
 
-        UploadPhotoResponse response = membroService.uploadPhoto(membroId, file);
+        UploadPhotoResponse response = membroService.uploadPhoto(userId, file);
         return ResponseEntity.ok(response);
     }
 

@@ -115,10 +115,10 @@ public class AutoCadastroServiceImpl implements AutoCadastroService {
 
     @Override
     @Transactional(readOnly = true)
-    public MembroProfileResponse getMembroProfile(UUID membroId) {
-        log.debug("Buscando perfil do membro: {}", membroId);
+    public MembroProfileResponse getMembroProfile(UUID userId) {
+        log.debug("Buscando perfil do membro: {}", userId);
 
-        Membro membro = membroRepository.findById(membroId)
+        Membro membro = membroRepository.findByUserId(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Membro não encontrado"));
 
         return MembroProfileResponse.builder()
@@ -150,15 +150,14 @@ public class AutoCadastroServiceImpl implements AutoCadastroService {
     }
 
     @Override
-    public MembroProfileResponse updateMembroProfile(UUID membroId, UpdateMembroProfileRequest request) {
-        log.info("Atualizando perfil do membro: {}", membroId);
+    public MembroProfileResponse updateMembroProfile(UUID userId, UpdateMembroProfileRequest request) {
+        log.info("Atualizando perfil do membro: {}", userId);
 
-        Membro membro = membroRepository.findById(membroId)
+        Membro membro = membroRepository.findByUserId(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Membro não encontrado"));
 
-        // Verificar se email não está sendo usado por outro membro
         if (!membro.getEmail().equals(request.getEmail()) &&
-                membroRepository.existsByEmailAndIdNot(request.getEmail(), membroId)) {
+                membroRepository.existsByEmailAndIdNot(request.getEmail(), membro.getId())) {
             throw new IllegalArgumentException("Email já está sendo usado por outro membro");
         }
 
@@ -189,9 +188,9 @@ public class AutoCadastroServiceImpl implements AutoCadastroService {
 
         Membro savedMembro = membroRepository.save(membro);
 
-        log.info("Perfil atualizado com sucesso - Membro: {}", membroId);
+        log.info("Perfil atualizado com sucesso - Membro: {}", membro.getId());
 
-        return getMembroProfile(savedMembro.getId());
+        return getMembroProfile(savedMembro.getUserId());
     }
 
     @Override

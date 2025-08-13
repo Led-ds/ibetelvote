@@ -11,9 +11,9 @@ public interface AutoCadastroService {
 
     LoginResponse createUserByMembro(ValidarMembroRequest dadosMembro, CreateUserByMembroRequest dadosUsuario);
 
-    MembroProfileResponse getMembroProfile(UUID membroId);
+    MembroProfileResponse getMembroProfile(UUID userId);
 
-    MembroProfileResponse updateMembroProfile(UUID membroId, UpdateMembroProfileRequest request);
+    MembroProfileResponse updateMembroProfile(UUID userId, UpdateMembroProfileRequest request);
 
     boolean canMembroCreateUser(String email, String cpf);
 }
