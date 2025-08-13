@@ -43,20 +43,27 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
-                .csrf(AbstractHttpConfigurer::disable) // Desabilita CSRF para API stateless
-                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Configura CORS
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Configura para ser stateless (JWT)
+                .csrf(AbstractHttpConfigurer::disable)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Endpoints públicos
+                        // === ENDPOINTS PÚBLICOS (ORDEM ESPECÍFICA → GERAL) ===
+
+                        // Autenticação básica
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/validate").permitAll()
+
+                        //AUTO-CADASTRO PÚBLICO - DEVE VIR ANTES DE QUALQUER MATCHER GERAL
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auto-cadastro/validar-membro").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auto-cadastro/criar-usuario").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/auto-cadastro/verificar-elegibilidade").permitAll()
 
                         // Debug endpoints (remover em produção)
                         .requestMatchers("/debug/**").permitAll()
 
                         // Documentação e ferramentas de desenvolvimento
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
-                        .requestMatchers("/h2-console/**").permitAll() // Permite acesso ao H2 console em dev
+                        .requestMatchers("/h2-console/**").permitAll()
                         .requestMatchers("/favicon.ico").permitAll()
 
                         // Actuator
@@ -65,8 +72,19 @@ public class SecurityConfig {
                         // Arquivos estáticos
                         .requestMatchers(HttpMethod.GET, "/api/v1/files/**").permitAll()
 
+                        // ✅ ENDPOINT DE ERRO - DEVE SER PÚBLICO
+                        .requestMatchers("/error").permitAll()
+
+                        // === ENDPOINTS AUTENTICADOS ===
+
                         // Endpoints de autenticação autorizados
                         .requestMatchers("/api/v1/auth/me", "/api/v1/auth/logout").authenticated()
+
+                        // ✅ AUTO-CADASTRO AUTENTICADO - PERFIL PRÓPRIO
+                        .requestMatchers(HttpMethod.GET, "/api/v1/auto-cadastro/meu-perfil").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/auto-cadastro/meu-perfil").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auto-cadastro/meu-perfil/foto").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/auto-cadastro/meu-perfil/foto").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
 
                         // === ELEIÇÕES - ORDEM IMPORTA! ===
                         // Endpoints específicos primeiro (mais restritivos)
@@ -132,7 +150,7 @@ public class SecurityConfig {
                 )
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.sameOrigin())) // Necessário para o H2 console
+                .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.sameOrigin()))
                 .build();
     }
 
