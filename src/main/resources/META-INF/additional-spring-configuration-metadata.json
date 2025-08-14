@@ -64,5 +64,10 @@
       "name": "springdoc.security.bearer.bearer-format",
       "type": "java.lang.String",
       "description": "Description for springdoc.security.bearer.bearer-format."
+    },
+    {
+      "name": "app.upload.dir",
+      "type": "java.lang.String",
+      "description": "Description for app.upload.dir."
     }
   ] }

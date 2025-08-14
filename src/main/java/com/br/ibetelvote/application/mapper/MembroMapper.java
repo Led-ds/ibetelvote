@@ -27,6 +27,12 @@ public interface MembroMapper {
     @Mapping(target = "hasUser", expression = "java(membro.hasUser())")
     MembroListResponse toListResponse(Membro membro);
 
+    @Mapping(target = "hasUser", expression = "java(membro.hasUser())")
+    @Mapping(target = "isBasicProfileComplete", expression = "java(membro.isBasicProfileComplete())")
+    @Mapping(target = "isFullProfileComplete", expression = "java(membro.isFullProfileComplete())")
+    @Mapping(target = "photoUrl", ignore = true)
+    MembroProfileResponse toProfileResponse(Membro membro);
+
     List<MembroResponse> toResponseList(List<Membro> membros);
 
     List<MembroListResponse> toListResponseList(List<Membro> membros);
