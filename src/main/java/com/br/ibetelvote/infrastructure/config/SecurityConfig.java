@@ -71,8 +71,9 @@ public class SecurityConfig {
 
                         // Arquivos estáticos
                         .requestMatchers(HttpMethod.GET, "/api/v1/files/**").permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/api/v1/files/**").permitAll()
 
-                        // ✅ ENDPOINT DE ERRO - DEVE SER PÚBLICO
+                        //ENDPOINT DE ERRO - DEVE SER PÚBLICO
                         .requestMatchers("/error").permitAll()
 
                         // === ENDPOINTS AUTENTICADOS ===
@@ -80,7 +81,7 @@ public class SecurityConfig {
                         // Endpoints de autenticação autorizados
                         .requestMatchers("/api/v1/auth/me", "/api/v1/auth/logout").authenticated()
 
-                        // ✅ AUTO-CADASTRO AUTENTICADO - PERFIL PRÓPRIO
+                        //AUTO-CADASTRO AUTENTICADO - PERFIL PRÓPRIO
                         .requestMatchers(HttpMethod.GET, "/api/v1/auto-cadastro/meu-perfil").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/auto-cadastro/meu-perfil").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
                         .requestMatchers(HttpMethod.POST, "/api/v1/auto-cadastro/meu-perfil/foto").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
@@ -162,10 +163,17 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(List.of("*"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
+
+        configuration.setExposedHeaders(List.of(
+                "Content-Type",
+                "Content-Length",
+                "Accept-Ranges",
+                "Content-Range"
+        ));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

@@ -27,6 +27,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Arquivos", description = "Endpoints para servir arquivos estáticos")
+@CrossOrigin(origins = "*", allowedHeaders = "*")
 public class FileController {
 
     private final FileStorageService fileStorageService;
@@ -39,6 +40,7 @@ public class FileController {
         MEDIA_TYPE_MAP.put("png", MediaType.IMAGE_PNG);
         MEDIA_TYPE_MAP.put("webp", MediaType.valueOf("image/webp"));
         MEDIA_TYPE_MAP.put("gif", MediaType.IMAGE_GIF);
+        MEDIA_TYPE_MAP.put("svg", MediaType.valueOf("image/svg+xml"));
         MEDIA_TYPE_MAP.put("pdf", MediaType.APPLICATION_PDF);
     }
 
@@ -72,6 +74,15 @@ public class FileController {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(mediaType);
             headers.setContentLength(fileData.length);
+
+            headers.add("Access-Control-Allow-Origin", "*");
+            headers.add("Access-Control-Allow-Methods", "GET, OPTIONS");
+            headers.add("Access-Control-Allow-Headers", "*");
+            headers.add("Access-Control-Max-Age", "3600");
+
+            headers.add("X-Content-Type-Options", "nosniff");
+            headers.add("Content-Security-Policy", "default-src 'self'; img-src * data:;");
+
 
             // Cache headers para imagens
             if (isImageFile(fileExtension)) {
@@ -186,6 +197,6 @@ public class FileController {
         return extension != null &&
                 (extension.equals("jpg") || extension.equals("jpeg") ||
                         extension.equals("png") || extension.equals("webp") ||
-                        extension.equals("gif"));
+                        extension.equals("gif") || extension.equals("svg"));
     }
 }
