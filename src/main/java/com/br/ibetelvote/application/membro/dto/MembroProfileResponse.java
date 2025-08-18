@@ -37,8 +37,13 @@ public class MembroProfileResponse {
     private String estado;
     private String cep;
 
+    // Foto - Novos campos
+    private String fotoBase64;
+    private String fotoTipo;
+    private String fotoNome;
+    private boolean temFoto;
+
     // Outros
-    private String foto;
     private String observacoes;
     private Boolean ativo;
 
@@ -46,7 +51,6 @@ public class MembroProfileResponse {
     private boolean hasUser;
     private boolean isBasicProfileComplete;
     private boolean isFullProfileComplete;
-    private String photoUrl;
 
     // Auditoria
     private LocalDateTime createdAt;

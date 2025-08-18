@@ -32,7 +32,7 @@ public interface MembroRepository {
     // Consultas específicas
     List<Membro> findByUserIdIsNull(); // Membros sem usuário
     List<Membro> findByUserIdIsNotNull(); // Membros com usuário
-    List<Membro> findByFotoIsNull(); // Membros sem foto
+    List<Membro> findByFotoDataIsNull(); // Membros sem foto
     List<Membro> findMembrosWithIncompleteProfile();
 
     // Consultas com filtros dinâmicos

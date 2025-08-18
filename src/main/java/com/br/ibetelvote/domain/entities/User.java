@@ -199,15 +199,12 @@ public class User implements UserDetails {
         return hasMembro() ? membro.getNome() : null;
     }
 
-    public String getFoto() {
-        return hasMembro() ? membro.getFoto() : null;
+    public String getFotoBase64() {
+        return hasMembro() ? membro.getFotoBase64() : null;
     }
 
-    public String getPhotoUrl() {
-        return hasMembro() ? membro.getPhotoUrl() : getDefaultPhotoUrl();
+    public boolean hasFoto() {
+        return hasMembro() && membro.hasPhoto();
     }
 
-    private String getDefaultPhotoUrl() {
-        return "/api/v1/files/default-avatar.png";
-    }
 }

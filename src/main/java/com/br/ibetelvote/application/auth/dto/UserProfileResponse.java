@@ -16,7 +16,7 @@ public class UserProfileResponse {
     String nome;
     String email;
     UserRole role;
-    String foto;
+    String fotoBase64;
     String cargo;
 
     @JsonFormat(pattern = "yyyy-MM-dd")

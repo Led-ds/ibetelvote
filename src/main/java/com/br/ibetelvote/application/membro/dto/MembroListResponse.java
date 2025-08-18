@@ -19,7 +19,7 @@ public class MembroListResponse {
     private String cargo;
     private String departamento;
     private LocalDate dataNascimento;
-    private String foto;
+    private String fotoBase64;
     private String primaryPhone;
     private Boolean ativo;
     private boolean hasUser;

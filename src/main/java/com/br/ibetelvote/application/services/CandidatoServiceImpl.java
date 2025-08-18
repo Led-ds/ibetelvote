@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
@@ -35,9 +36,12 @@ public class CandidatoServiceImpl implements CandidatoService {
     private final EleicaoJpaRepository eleicaoRepository;
     private final CargoJpaRepository cargoRepository;
     private final CandidatoMapper candidatoMapper;
-    private final FileStorageService fileStorageService;
 
-    // === OPERAÇÕES BÁSICAS ===
+    private static final long MAX_FILE_SIZE = 500 * 1024;
+    private static final List<String> ALLOWED_CONTENT_TYPES = List.of( "image/jpeg",
+                                                                        "image/jpg",
+                                                                        "image/png",
+                                                                        "image/webp");
 
     @Override
     @CacheEvict(value = {"candidatos", "eleicoes", "cargos"}, allEntries = true)
@@ -155,25 +159,13 @@ public class CandidatoServiceImpl implements CandidatoService {
         Candidato candidato = candidatoRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Candidato não encontrado com ID: " + id));
 
-        // Validar se pode ser removido
         if (!canDeleteCandidato(id)) {
             throw new IllegalStateException("Não é possível remover candidato que já recebeu votos");
-        }
-
-        // Remover foto de campanha se existir
-        if (candidato.temFotoCampanha()) {
-            try {
-                fileStorageService.deleteFile(candidato.getFotoCampanha().replace("/api/v1/files/", ""));
-            } catch (Exception e) {
-                log.warn("Erro ao remover foto do candidato {}: {}", id, e.getMessage());
-            }
         }
 
         candidatoRepository.delete(candidato);
         log.info("Candidato removido com sucesso - ID: {}", id);
     }
-
-    // === OPERAÇÕES DE APROVAÇÃO ===
 
     @Override
     @CacheEvict(value = {"candidatos", "eleicoes", "cargos"}, allEntries = true)
@@ -271,26 +263,27 @@ public class CandidatoServiceImpl implements CandidatoService {
                 .orElseThrow(() -> new IllegalArgumentException("Candidato não encontrado com ID: " + id));
 
         try {
-            // Remover foto anterior se existir
-            if (candidato.temFotoCampanha()) {
-                fileStorageService.deleteFile(candidato.getFotoCampanha().replace("/api/v1/files/", ""));
-            }
+            // Validar arquivo
+            validatePhotoFile(file);
 
-            String fileName = fileStorageService.storeFile(file, "candidatos/fotos");
-            String fileUrl = "/api/v1/files/" + fileName;
+            // Converter para bytes
+            byte[] fotoData = file.getBytes();
+            String contentType = file.getContentType();
+            String fileName = file.getOriginalFilename();
 
-            candidato.updateFotoCampanha(fileUrl);
+            // Atualizar foto do candidato
+            candidato.updateFotoCampanha(fotoData, contentType, fileName);
             candidatoRepository.save(candidato);
 
             log.info("Upload de foto de campanha concluído para candidato ID: {} - Arquivo: {}", id, fileName);
 
             return UploadPhotoResponse.builder()
                     .fileName(fileName)
-                    .fileUrl(fileUrl)
+                    .fotoBase64(candidato.getFotoCampanhaBase64()) // ✅ Retorna Base64
                     .message("Upload realizado com sucesso")
                     .build();
 
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.error("Erro ao fazer upload de foto para candidato ID: {}", id, e);
             throw new RuntimeException("Erro ao fazer upload da foto: " + e.getMessage());
         }
@@ -305,10 +298,8 @@ public class CandidatoServiceImpl implements CandidatoService {
                 .orElseThrow(() -> new IllegalArgumentException("Candidato não encontrado com ID: " + id));
 
         if (candidato.temFotoCampanha()) {
-            fileStorageService.deleteFile(candidato.getFotoCampanha().replace("/api/v1/files/", ""));
             candidato.removeFotoCampanha();
             candidatoRepository.save(candidato);
-
             log.info("Foto de campanha removida com sucesso - ID: {}", id);
         }
     }
@@ -399,5 +390,28 @@ public class CandidatoServiceImpl implements CandidatoService {
     @Transactional(readOnly = true)
     public long getTotalCandidatosAprovados() {
         return candidatoRepository.countByAprovadoTrue();
+    }
+
+    private void validatePhotoFile(MultipartFile file) {
+
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Arquivo não pode estar vazio");
+        }
+
+        // Validar tamanho (máximo 500KB)
+        if (file.getSize() > MAX_FILE_SIZE) {
+            throw new IllegalArgumentException(
+                    String.format("Arquivo muito grande. Tamanho máximo permitido: %d KB",
+                            MAX_FILE_SIZE / 1024)
+            );
+        }
+
+        // Validar tipo
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase())) {
+            throw new IllegalArgumentException(
+                    "Tipo de arquivo não permitido. Permitidos: JPEG, PNG, WEBP"
+            );
+        }
     }
 }

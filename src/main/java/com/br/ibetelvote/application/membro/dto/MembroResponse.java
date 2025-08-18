@@ -34,6 +34,11 @@ public class MembroResponse {
     private String estado;
     private String cep;
 
+    //Foto
+    private String fotoBase64;
+    private String fotoTipo;
+    private String fotoNome;
+
     // Outros
     private String foto;
     private String observacoes;
@@ -48,7 +53,6 @@ public class MembroResponse {
     private LocalDateTime updatedAt;
 
     // Campos computados
-    private String photoUrl;
     private String primaryPhone;
     private String fullAddress;
     private boolean hasUser;
