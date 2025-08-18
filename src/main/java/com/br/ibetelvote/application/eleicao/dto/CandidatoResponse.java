@@ -25,7 +25,14 @@ public class CandidatoResponse {
     private String descricaoCandidatura;
     private String propostas;
     private String experiencia;
-    private String fotoCampanha;
+
+    // === CAMPOS DE FOTO REFATORADOS ===
+    // Removido: private String fotoCampanha;
+    private String fotoCampanhaTipo;      // Tipo MIME da imagem (image/jpeg, image/png, etc.)
+    private String fotoCampanhaNome;      // Nome original do arquivo
+    private String fotoCampanhaBase64;    // Dados da imagem em Base64 (opcional, para quando precisar)
+    private Long fotoCampanhaSize;        // Tamanho do arquivo em bytes
+
     private Boolean ativo;
     private Boolean aprovado;
     private String motivoReprovacao;
@@ -42,7 +49,7 @@ public class CandidatoResponse {
     private int totalVotos;
     private String statusCandidatura;
     private String numeroFormatado;
-    private String fotoCampanhaUrl;
+    private String fotoCampanhaUrl;       // URL para endpoint que serve a foto
     private double percentualVotos;
     private String resumoVotacao;
     private boolean temFotoCampanha;

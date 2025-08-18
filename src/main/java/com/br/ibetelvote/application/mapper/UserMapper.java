@@ -37,7 +37,7 @@ public interface UserMapper {
     @Mapping(target = "email", source = "email")
     @Mapping(target = "role", source = "role")
     @Mapping(target = "nome", source = "membro.nome")
-    @Mapping(target = "foto", source = "membro.foto")
+    @Mapping(target = "fotoBase64", expression = "java(user.getMembro() != null ? user.getMembro().getFotoBase64() : null)")  // ✅ Mudou
     @Mapping(target = "cargo", source = "membro.cargo")
     @Mapping(target = "dataNascimento", source = "membro.dataNascimento")
     UserProfileResponse toUserProfileResponse(User user);
@@ -51,7 +51,7 @@ public interface UserMapper {
         return MembroBasicInfo.builder()
                 .id(membro.getId())
                 .nome(membro.getNome())
-                .foto(membro.getFoto())
+                .fotoBase64(membro.getFotoBase64())
                 .cargo(membro.getCargo())
                 .ativo(membro.getAtivo())
                 .build();

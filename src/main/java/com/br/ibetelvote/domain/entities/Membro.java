@@ -9,6 +9,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.UUID;
 
 @Entity
@@ -80,10 +81,18 @@ public class Membro {
     @Column(name = "cep", length = 10)
     private String cep;
 
-    // === DADOS ADICIONAIS ===
-    @Column(name = "foto", length = 500)
-    private String foto;
+    // === DADOS DA FOTO (NOVO) ===
+    @Lob
+    @Column(name = "foto_data")
+    private byte[] fotoData;
 
+    @Column(name = "foto_tipo", length = 50)
+    private String fotoTipo;
+
+    @Column(name = "foto_nome", length = 255)
+    private String fotoNome;
+
+    // === DADOS ADICIONAIS ===
     @Column(name = "observacoes", columnDefinition = "TEXT")
     private String observacoes;
 
@@ -157,12 +166,34 @@ public class Membro {
         this.cep = cep;
     }
 
-    public void updatePhoto(String foto) {
-        this.foto = foto;
+    /**
+     * Atualiza a foto do membro
+     */
+    public void updatePhoto(byte[] fotoData, String fotoTipo, String fotoNome) {
+        this.fotoData = fotoData;
+        this.fotoTipo = fotoTipo;
+        this.fotoNome = fotoNome;
     }
 
+    /**
+     * Remove a foto do membro
+     */
     public void removePhoto() {
-        this.foto = null;
+        this.fotoData = null;
+        this.fotoTipo = null;
+        this.fotoNome = null;
+    }
+
+    /**
+     * Retorna a foto como Base64 para envio ao frontend
+     */
+    @Transient
+    public String getFotoBase64() {
+        if (fotoData != null && fotoData.length > 0) {
+            return "data:" + fotoTipo + ";base64," +
+                    Base64.getEncoder().encodeToString(fotoData);
+        }
+        return null;
     }
 
     public boolean canCreateUser() {
@@ -197,12 +228,8 @@ public class Membro {
         return this.nome;
     }
 
-    public String getPhotoUrl() {
-        return this.foto != null ? this.foto : getDefaultPhotoUrl();
-    }
-
     public boolean hasPhoto() {
-        return this.foto != null && !this.foto.trim().isEmpty();
+        return this.fotoData != null && this.fotoData.length > 0;
     }
 
     public boolean hasCompleteAddress() {
@@ -257,10 +284,6 @@ public class Membro {
             return 0;
         }
         return java.time.Period.between(this.dataMembroDesde, LocalDate.now()).getYears();
-    }
-
-    private String getDefaultPhotoUrl() {
-        return "/api/v1/files/default-avatar.png";
     }
 
     // === MÉTODOS PARA VALIDAÇÃO ===

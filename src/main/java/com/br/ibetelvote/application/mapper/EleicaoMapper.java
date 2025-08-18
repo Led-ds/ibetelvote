@@ -87,7 +87,7 @@ public interface EleicaoMapper {
                         .id(candidato.getId())
                         .nomeCandidato(candidato.getNomeCandidato())
                         .numeroCandidato(candidato.getNumeroCandidato())
-                        .fotoCampanha(candidato.getFotoCampanha())
+                        .temFotoCampanha(candidato.temFotoCampanha())
                         .aprovado(candidato.getAprovado())
                         .totalVotos(candidato.getTotalVotos())
                         .nomeCargoRetendido(candidato.getNomeCargoRetendido())

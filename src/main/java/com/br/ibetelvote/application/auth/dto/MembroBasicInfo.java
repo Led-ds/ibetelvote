@@ -14,7 +14,7 @@ import java.util.UUID;
 public class MembroBasicInfo {
     private UUID id;
     private String nome;
-    private String foto;
+    private String fotoBase64;
     private String cargo;
     private Boolean ativo;
 }

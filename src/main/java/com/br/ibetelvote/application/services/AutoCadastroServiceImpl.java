@@ -12,7 +12,6 @@ import com.br.ibetelvote.infrastructure.repositories.MembroJpaRepository;
 import com.br.ibetelvote.infrastructure.repositories.UserJpaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,9 +29,6 @@ public class AutoCadastroServiceImpl implements AutoCadastroService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthMapper authMapper;
-
-    @Value("${app.base-url:http://localhost:8081}")
-    private String baseUrl;
 
     @Override
     @Transactional(readOnly = true)
@@ -141,14 +137,15 @@ public class AutoCadastroServiceImpl implements AutoCadastroService {
                 .cidade(membro.getCidade())
                 .estado(membro.getEstado())
                 .cep(membro.getCep())
-                .foto(membro.getFoto())
-                .photoUrl(buildFullUrl(membro.getFoto()))
+                .fotoBase64(membro.getFotoBase64())
+                .fotoTipo(membro.getFotoTipo())
+                .fotoNome(membro.getFotoNome())
+                .temFoto(membro.hasPhoto())
                 .observacoes(membro.getObservacoes())
                 .ativo(membro.getAtivo())
                 .hasUser(membro.hasUser())
                 .isBasicProfileComplete(membro.isBasicProfileComplete())
                 .isFullProfileComplete(membro.isFullProfileComplete())
-                .photoUrl(membro.getPhotoUrl())
                 .createdAt(membro.getCreatedAt())
                 .updatedAt(membro.getUpdatedAt())
                 .build();
@@ -204,25 +201,6 @@ public class AutoCadastroServiceImpl implements AutoCadastroService {
         return membroRepository.findByEmailAndCpf(email, cpf)
                 .map(Membro::canCreateUser)
                 .orElse(false);
-    }
-
-    private String buildFullUrl(String path) {
-        if (path == null || path.isEmpty()) {
-            return null;
-        }
-
-        // Se já for uma URL completa, retornar como está
-        if (path.startsWith("http://") || path.startsWith("https://")) {
-            return path;
-        }
-
-        // Construir URL completa
-        String cleanPath = path.startsWith("/") ? path : "/" + path;
-        String fullUrl = baseUrl + cleanPath;
-
-        log.debug("URL da foto construída: {} -> {}", path, fullUrl);
-
-        return fullUrl;
     }
 
 }

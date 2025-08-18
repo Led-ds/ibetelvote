@@ -9,6 +9,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
@@ -67,8 +68,15 @@ public class Candidato {
     @Column(name = "experiencia", columnDefinition = "TEXT")
     private String experiencia;
 
-    @Column(name = "foto_campanha", length = 500)
-    private String fotoCampanha;
+    @Lob
+    @Column(name = "foto_campanha_data")
+    private byte[] fotoCampanhaData;
+
+    @Column(name = "foto_campanha_tipo", length = 50)
+    private String fotoCampanhaTipo;
+
+    @Column(name = "foto_campanha_nome", length = 255)
+    private String fotoCampanhaNome;
 
     @Builder.Default
     @Column(name = "ativo", nullable = false)
@@ -120,12 +128,16 @@ public class Candidato {
         this.experiencia = experiencia;
     }
 
-    public void updateFotoCampanha(String fotoCampanha) {
-        this.fotoCampanha = fotoCampanha;
+    public void updateFotoCampanha(byte[] fotoCampanhaData, String fotoCampanhaTipo, String fotoCampanhaNome) {
+        this.fotoCampanhaData = fotoCampanhaData;
+        this.fotoCampanhaTipo = fotoCampanhaTipo;
+        this.fotoCampanhaNome = fotoCampanhaNome;
     }
 
     public void removeFotoCampanha() {
-        this.fotoCampanha = null;
+        this.fotoCampanhaData = null;
+        this.fotoCampanhaTipo = null;
+        this.fotoCampanhaNome = null;
     }
 
     public void activate() {
@@ -172,7 +184,7 @@ public class Candidato {
     }
 
     public boolean temFotoCampanha() {
-        return fotoCampanha != null && !fotoCampanha.trim().isEmpty();
+        return fotoCampanhaData != null && fotoCampanhaData.length > 0;
     }
 
     public boolean temNumero() {
@@ -215,15 +227,6 @@ public class Candidato {
         return numeroCandidato != null ? numeroCandidato : "S/N";
     }
 
-    public String getFotoCampanhaUrl() {
-        if (temFotoCampanha()) {
-            return fotoCampanha;
-        }
-        // Usar foto do membro se não tiver foto de campanha
-        return membro != null && membro.hasPhoto() ?
-                membro.getPhotoUrl() : getDefaultPhotoUrl();
-    }
-
     public double getPercentualVotos() {
         if (cargo == null || cargo.getTotalVotosValidos() == 0) {
             return 0.0;
@@ -235,6 +238,26 @@ public class Candidato {
         int votos = getTotalVotos();
         double percentual = getPercentualVotos();
         return String.format("%d votos (%.1f%%)", votos, percentual);
+    }
+
+    @Transient
+    public String getFotoCampanhaBase64() {
+        if (temFotoCampanha()) {
+            return java.util.Base64.getEncoder().encodeToString(fotoCampanhaData);
+        }
+        return null;
+    }
+
+    public String getFotoCampanhaDataUri() {
+        if (temFotoCampanha() && fotoCampanhaTipo != null) {
+            String base64 = getFotoCampanhaBase64();
+            return "data:" + fotoCampanhaTipo + ";base64," + base64;
+        }
+        return null;
+    }
+
+    public long getFotoCampanhaSize() {
+        return temFotoCampanha() ? fotoCampanhaData.length : 0;
     }
 
     // === MÉTODOS DE INFORMAÇÃO ===
@@ -253,10 +276,6 @@ public class Candidato {
 
     public boolean isMembroAtivo() {
         return membro != null && membro.isActive();
-    }
-
-    private String getDefaultPhotoUrl() {
-        return "/api/v1/files/default-candidate.png";
     }
 
     // === MÉTODOS DE COMPARAÇÃO ===

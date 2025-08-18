@@ -5,7 +5,6 @@ import com.br.ibetelvote.application.mapper.MembroMapper;
 import com.br.ibetelvote.application.shared.dto.UploadPhotoResponse;
 import com.br.ibetelvote.domain.entities.Membro;
 import com.br.ibetelvote.domain.entities.User;
-import com.br.ibetelvote.domain.services.FileStorageService;
 import com.br.ibetelvote.domain.services.MembroService;
 import com.br.ibetelvote.infrastructure.repositories.MembroJpaRepository;
 import com.br.ibetelvote.infrastructure.repositories.UserJpaRepository;
@@ -21,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,9 +34,19 @@ public class MembroServiceImpl implements MembroService {
     private final MembroJpaRepository membroRepository;
     private final UserJpaRepository userRepository;
     private final MembroMapper membroMapper;
-    private final FileStorageService fileStorageService;
 
-    // === OPERAÇÕES BÁSICAS ===
+    // Remover FileStorageService - não precisamos mais
+    // private final FileStorageService fileStorageService;
+
+    private static final long MAX_FILE_SIZE = 500 * 1024; // 500KB
+    private static final List<String> ALLOWED_CONTENT_TYPES = List.of(
+            "image/jpeg",
+            "image/jpg",
+            "image/png",
+            "image/webp"
+    );
+
+    // === OPERAÇÕES BÁSICAS (mantém como está) ===
 
     @Override
     @CacheEvict(value = {"membros", "membro-stats"}, allEntries = true)
@@ -76,6 +86,7 @@ public class MembroServiceImpl implements MembroService {
 
         return membroMapper.toResponse(membro);
     }
+
     @Override
     @Cacheable(value = "membros", key = "#email")
     @Transactional(readOnly = true)
@@ -130,20 +141,12 @@ public class MembroServiceImpl implements MembroService {
         Membro membro = membroRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Membro não encontrado com ID: " + id));
 
-        // Remover foto se existir
-        if (membro.hasPhoto()) {
-            try {
-                fileStorageService.deleteFile(membro.getFoto().replace("/api/v1/files/", ""));
-            } catch (Exception e) {
-                log.warn("Erro ao remover foto do membro {}: {}", id, e.getMessage());
-            }
-        }
-
+        // Não precisa mais remover arquivo físico
         membroRepository.delete(membro);
         log.info("Membro removido com sucesso - ID: {}", id);
     }
 
-    // === OPERAÇÕES DE CONTROLE ===
+    // === OPERAÇÕES DE CONTROLE (mantém como está) ===
 
     @Override
     @CacheEvict(value = {"membros", "membro-stats"}, allEntries = true)
@@ -173,7 +176,7 @@ public class MembroServiceImpl implements MembroService {
         log.info("Membro desativado com sucesso - ID: {}", id);
     }
 
-    // === OPERAÇÕES DE ASSOCIAÇÃO ===
+    // === OPERAÇÕES DE ASSOCIAÇÃO (mantém como está) ===
 
     @Override
     @CacheEvict(value = {"membros", "membro-stats"}, allEntries = true)
@@ -187,7 +190,7 @@ public class MembroServiceImpl implements MembroService {
             throw new IllegalArgumentException("Usuário não encontrado com ID: " + request.getUserId());
         }
 
-        Optional<User> userOpt = userRepository.findById(request.getUserId() );
+        Optional<User> userOpt = userRepository.findById(request.getUserId());
         User user = userOpt.orElse(null);
 
         if (membroRepository.existsByUserId(user.getId())) {
@@ -223,37 +226,39 @@ public class MembroServiceImpl implements MembroService {
         log.info("Usuário desassociado com sucesso - Membro: {}, Ex-User: {}", membroId, oldUserId);
     }
 
-    // === OPERAÇÕES DE FOTO ===
+    // === OPERAÇÕES DE FOTO (REFATORADA) ===
 
     @Override
     @CacheEvict(value = "membros", key = "#userId")
     public UploadPhotoResponse uploadPhoto(UUID userId, MultipartFile file) {
         log.info("Fazendo upload de foto para membro ID: {}", userId);
 
+        // Buscar membro
         Membro membro = membroRepository.findByUserId(userId)
-                .orElseThrow(() -> new IllegalArgumentException("Membro não encontrado com ID: " + userId));
+                .orElseThrow(() -> new IllegalArgumentException("Membro não encontrado com userId: " + userId));
 
         try {
-            // Remover foto anterior se existir
-            if (membro.hasPhoto()) {
-                fileStorageService.deleteFile(membro.getFoto().replace("/api/v1/files/", ""));
-            }
+            // Validar arquivo
+            validatePhotoFile(file);
 
-            String fileName = fileStorageService.storeFile(file, "membros/fotos");
-            String fileUrl = "/api/v1/files/" + fileName;
+            // Converter para bytes
+            byte[] fotoData = file.getBytes();
+            String contentType = file.getContentType();
+            String fileName = file.getOriginalFilename();
 
-            membro.updatePhoto(fileUrl);
+            // Atualizar foto do membro
+            membro.updatePhoto(fotoData, contentType, fileName);
             membroRepository.save(membro);
 
             log.info("Upload de foto concluído para membro ID: {} - Arquivo: {}", userId, fileName);
 
             return UploadPhotoResponse.builder()
                     .fileName(fileName)
-                    .fileUrl(fileUrl)
+                    .fotoBase64(membro.getFotoBase64()) // Retorna Base64
                     .message("Upload realizado com sucesso")
                     .build();
 
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.error("Erro ao fazer upload de foto para membro ID: {}", userId, e);
             throw new RuntimeException("Erro ao fazer upload da foto: " + e.getMessage());
         }
@@ -268,15 +273,38 @@ public class MembroServiceImpl implements MembroService {
                 .orElseThrow(() -> new IllegalArgumentException("Membro não encontrado com ID: " + id));
 
         if (membro.hasPhoto()) {
-            fileStorageService.deleteFile(membro.getFoto().replace("/api/v1/files/", ""));
             membro.removePhoto();
             membroRepository.save(membro);
-
             log.info("Foto removida com sucesso - ID: {}", id);
         }
     }
 
-    // === CONSULTAS ESPECÍFICAS ===
+    /**
+     * Valida o arquivo de foto
+     */
+    private void validatePhotoFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Arquivo não pode estar vazio");
+        }
+
+        // Validar tamanho (máximo 500KB)
+        if (file.getSize() > MAX_FILE_SIZE) {
+            throw new IllegalArgumentException(
+                    String.format("Arquivo muito grande. Tamanho máximo permitido: %d KB",
+                            MAX_FILE_SIZE / 1024)
+            );
+        }
+
+        // Validar tipo
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase())) {
+            throw new IllegalArgumentException(
+                    "Tipo de arquivo não permitido. Permitidos: JPEG, PNG, WEBP"
+            );
+        }
+    }
+
+    // === CONSULTAS ESPECÍFICAS (mantém como está) ===
 
     @Override
     @Cacheable(value = "membros-without-user")
@@ -297,7 +325,8 @@ public class MembroServiceImpl implements MembroService {
     @Override
     @Transactional(readOnly = true)
     public List<MembroListResponse> getMembrosWithoutPhoto() {
-        List<Membro> membros = membroRepository.findByFotoIsNull();
+        // Ajustar query para buscar onde fotoData é null
+        List<Membro> membros = membroRepository.findByFotoDataIsNull();
         return membroMapper.toListResponseList(membros);
     }
 
@@ -308,7 +337,7 @@ public class MembroServiceImpl implements MembroService {
         return membroMapper.toListResponseList(membros);
     }
 
-    // === ESTATÍSTICAS ===
+    // === ESTATÍSTICAS (mantém como está) ===
 
     @Override
     @Cacheable(value = "membro-stats", key = "'total'")

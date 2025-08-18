@@ -53,7 +53,7 @@ public interface MembroJpaRepository extends JpaRepository<Membro, UUID>, Membro
     List<Membro> findByUserIdIsNotNull();
 
     @Override
-    List<Membro> findByFotoIsNull();
+    List<Membro> findByFotoDataIsNull();
 
     @Override
     @Query("SELECT m FROM Membro m WHERE " +

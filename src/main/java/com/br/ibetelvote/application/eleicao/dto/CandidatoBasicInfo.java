@@ -16,7 +16,7 @@ public class CandidatoBasicInfo {
     private UUID id;
     private String nomeCandidato;
     private String numeroCandidato;
-    private String fotoCampanha;
+    private Boolean temFotoCampanha;
     private Boolean aprovado;
     private int totalVotos;
     private String nomeCargoRetendido;

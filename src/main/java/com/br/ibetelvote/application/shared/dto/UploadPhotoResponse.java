@@ -10,8 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UploadPhotoResponse {
-
     private String fileName;
-    private String fileUrl;
+    private String fotoBase64;
     private String message;
 }
