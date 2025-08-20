@@ -3,14 +3,14 @@ package com.br.ibetelvote.application.services;
 import com.br.ibetelvote.application.eleicao.dto.*;
 import com.br.ibetelvote.application.mapper.CargoMapper;
 import com.br.ibetelvote.domain.entities.Cargo;
-import com.br.ibetelvote.domain.entities.Eleicao;
 import com.br.ibetelvote.domain.services.CargoService;
 import com.br.ibetelvote.infrastructure.repositories.CargoJpaRepository;
-import com.br.ibetelvote.infrastructure.repositories.EleicaoJpaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,38 +24,24 @@ import java.util.UUID;
 public class CargoServiceImpl implements CargoService {
 
     private final CargoJpaRepository cargoRepository;
-    private final EleicaoJpaRepository eleicaoRepository;
     private final CargoMapper cargoMapper;
 
     // === OPERAÇÕES BÁSICAS ===
 
     @Override
-    @CacheEvict(value = {"cargos", "eleicoes"}, allEntries = true)
+    @CacheEvict(value = "cargos", allEntries = true)
     public CargoResponse createCargo(CreateCargoRequest request) {
-        log.info("Criando novo cargo: {} para eleição: {}", request.getNome(), request.getEleicaoId());
+        log.info("Criando novo cargo: {}", request.getNome());
 
-        // Validar se eleição existe
-        Eleicao eleicao = eleicaoRepository.findById(request.getEleicaoId())
-                .orElseThrow(() -> new IllegalArgumentException("Eleição não encontrada com ID: " + request.getEleicaoId()));
+        // Validar dados
+        validarDadosCargo(request.getNome(), request.getDescricao());
 
-        // Validar se eleição pode receber novos cargos
-        if (eleicao.isVotacaoAberta()) {
-            throw new IllegalStateException("Não é possível adicionar cargos a eleição com votação em andamento");
-        }
-
-        // Validar se nome já existe na eleição
-        if (cargoRepository.existsByNomeAndEleicaoId(request.getNome(), request.getEleicaoId())) {
-            throw new IllegalArgumentException("Já existe um cargo com este nome nesta eleição");
+        // Verificar se nome já existe
+        if (existsCargoByNome(request.getNome())) {
+            throw new IllegalArgumentException("Já existe um cargo com o nome: " + request.getNome());
         }
 
         Cargo cargo = cargoMapper.toEntity(request);
-
-        // Definir ordem de votação se não foi especificada
-        if (cargo.getOrdemVotacao() == null) {
-            long totalCargos = cargoRepository.countByEleicaoId(request.getEleicaoId());
-            cargo.setOrdemVotacao((int) (totalCargos + 1));
-        }
-
         Cargo savedCargo = cargoRepository.save(cargo);
 
         log.info("Cargo criado com sucesso - ID: {}, Nome: {}", savedCargo.getId(), savedCargo.getNome());
@@ -75,32 +61,39 @@ public class CargoServiceImpl implements CargoService {
     }
 
     @Override
-    @Cacheable(value = "cargos-eleicao", key = "#eleicaoId")
+    @Cacheable(value = "cargos-page")
     @Transactional(readOnly = true)
-    public List<CargoResponse> getCargosByEleicaoId(UUID eleicaoId) {
-        log.debug("Buscando cargos da eleição: {}", eleicaoId);
+    public Page<CargoResponse> getAllCargos(Pageable pageable) {
+        log.debug("Buscando todos os cargos com paginação");
 
-        List<Cargo> cargos = cargoRepository.findByEleicaoId(eleicaoId);
+        Page<Cargo> cargos = cargoRepository.findAll(pageable);
+        return cargos.map(cargoMapper::toResponse);
+    }
+
+    @Override
+    @Cacheable(value = "cargos-all")
+    @Transactional(readOnly = true)
+    public List<CargoResponse> getAllCargos() {
+        log.debug("Buscando todos os cargos");
+
+        List<Cargo> cargos = cargoRepository.findAllByOrderByNomeAsc();
         return cargoMapper.toResponseList(cargos);
     }
 
     @Override
-    @CacheEvict(value = {"cargos", "eleicoes"}, allEntries = true)
+    @CacheEvict(value = "cargos", allEntries = true)
     public CargoResponse updateCargo(UUID id, UpdateCargoRequest request) {
         log.info("Atualizando cargo ID: {}", id);
 
         Cargo cargo = cargoRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Cargo não encontrado com ID: " + id));
 
-        // Validar se pode ser atualizado
-        if (cargo.getEleicao() != null && cargo.getEleicao().isVotacaoAberta()) {
-            throw new IllegalStateException("Não é possível atualizar cargo de eleição com votação em andamento");
-        }
-
-        // Validar nome único se foi alterado
+        // Validar nome se foi alterado
         if (request.getNome() != null && !request.getNome().equals(cargo.getNome())) {
-            if (cargoRepository.existsByNomeAndEleicaoId(request.getNome(), cargo.getEleicaoId())) {
-                throw new IllegalArgumentException("Já existe um cargo com este nome nesta eleição");
+            validarDadosCargo(request.getNome(), request.getDescricao());
+
+            if (!isNomeDisponivelParaAtualizacao(request.getNome(), id)) {
+                throw new IllegalArgumentException("Já existe um cargo com o nome: " + request.getNome());
             }
         }
 
@@ -112,7 +105,7 @@ public class CargoServiceImpl implements CargoService {
     }
 
     @Override
-    @CacheEvict(value = {"cargos", "eleicoes"}, allEntries = true)
+    @CacheEvict(value = "cargos", allEntries = true)
     public void deleteCargo(UUID id) {
         log.info("Removendo cargo ID: {}", id);
 
@@ -121,88 +114,173 @@ public class CargoServiceImpl implements CargoService {
 
         // Validar se pode ser removido
         if (!canDeleteCargo(id)) {
-            throw new IllegalStateException("Não é possível remover cargo que possui candidatos ou votos");
+            throw new IllegalStateException("Cargo não pode ser removido pois está em uso");
         }
 
         cargoRepository.delete(cargo);
         log.info("Cargo removido com sucesso - ID: {}", id);
     }
 
-    // === OPERAÇÕES ESPECÍFICAS ===
+    // === CONSULTAS ESPECÍFICAS ===
 
     @Override
-    @Cacheable(value = "cargos-ordenados", key = "#eleicaoId")
+    @Cacheable(value = "cargos-ativos")
     @Transactional(readOnly = true)
-    public List<CargoResponse> getCargosByEleicaoIdOrdenados(UUID eleicaoId) {
-        log.debug("Buscando cargos ordenados da eleição: {}", eleicaoId);
+    public List<CargoResponse> getCargosAtivos() {
+        log.debug("Buscando cargos ativos");
 
-        List<Cargo> cargos = cargoRepository.findByEleicaoIdOrderByOrdemVotacao(eleicaoId);
+        List<Cargo> cargos = cargoRepository.findByAtivoTrueOrderByNomeAsc();
         return cargoMapper.toResponseList(cargos);
     }
 
     @Override
-    @CacheEvict(value = {"cargos", "cargos-ordenados"}, allEntries = true)
-    public void reordernarCargos(UUID eleicaoId, List<UUID> cargoIds) {
-        log.info("Reordenando cargos da eleição: {}", eleicaoId);
+    @Cacheable(value = "cargos-ativos-page")
+    @Transactional(readOnly = true)
+    public Page<CargoResponse> getCargosAtivos(Pageable pageable) {
+        log.debug("Buscando cargos ativos com paginação");
 
-        // Validar se eleição existe
-        Eleicao eleicao = eleicaoRepository.findById(eleicaoId)
-                .orElseThrow(() -> new IllegalArgumentException("Eleição não encontrada com ID: " + eleicaoId));
+        Page<Cargo> cargos = cargoRepository.findByAtivoTrueOrderByNomeAsc(pageable);
+        return cargos.map(cargoMapper::toResponse);
+    }
 
-        // Validar se pode reordenar
-        if (eleicao.isVotacaoAberta()) {
-            throw new IllegalStateException("Não é possível reordenar cargos durante votação");
-        }
+    @Override
+    @Transactional(readOnly = true)
+    public List<CargoResponse> getCargosInativos() {
+        log.debug("Buscando cargos inativos");
 
-        // Atualizar ordem dos cargos
-        for (int i = 0; i < cargoIds.size(); i++) {
-            UUID cargoId = cargoIds.get(i);
-            Cargo cargo = cargoRepository.findById(cargoId)
-                    .orElseThrow(() -> new IllegalArgumentException("Cargo não encontrado com ID: " + cargoId));
+        List<Cargo> cargos = cargoRepository.findByAtivoFalse();
+        return cargoMapper.toResponseList(cargos);
+    }
 
-            if (!cargo.getEleicaoId().equals(eleicaoId)) {
-                throw new IllegalArgumentException("Cargo não pertence à eleição especificada");
-            }
+    @Override
+    @Transactional(readOnly = true)
+    public List<CargoResponse> getCargosByNome(String nome) {
+        log.debug("Buscando cargos por nome: {}", nome);
 
-            cargo.setOrdemVotacao(i + 1);
-            cargoRepository.save(cargo);
-        }
+        List<Cargo> cargos = cargoRepository.findByNomeContainingIgnoreCase(nome);
+        return cargoMapper.toResponseList(cargos);
+    }
 
-        log.info("Cargos reordenados com sucesso para eleição: {}", eleicaoId);
+    @Override
+    @Cacheable(value = "cargos-disponiveis")
+    @Transactional(readOnly = true)
+    public List<CargoResponse> getCargosDisponiveis() {
+        log.debug("Buscando cargos disponíveis para eleições");
+
+        List<Cargo> cargos = cargoRepository.findCargosDisponiveis();
+        return cargoMapper.toResponseList(cargos);
+    }
+
+    // === OPERAÇÕES DE STATUS ===
+
+    @Override
+    @CacheEvict(value = "cargos", allEntries = true)
+    public CargoResponse ativarCargo(UUID id) {
+        log.info("Ativando cargo ID: {}", id);
+
+        Cargo cargo = cargoRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Cargo não encontrado com ID: " + id));
+
+        cargo.activate();
+        Cargo savedCargo = cargoRepository.save(cargo);
+
+        log.info("Cargo ativado com sucesso - ID: {}", savedCargo.getId());
+        return cargoMapper.toResponse(savedCargo);
+    }
+
+    @Override
+    @CacheEvict(value = "cargos", allEntries = true)
+    public CargoResponse desativarCargo(UUID id) {
+        log.info("Desativando cargo ID: {}", id);
+
+        Cargo cargo = cargoRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Cargo não encontrado com ID: " + id));
+
+        cargo.deactivate();
+        Cargo savedCargo = cargoRepository.save(cargo);
+
+        log.info("Cargo desativado com sucesso - ID: {}", savedCargo.getId());
+        return cargoMapper.toResponse(savedCargo);
     }
 
     // === VALIDAÇÕES ===
 
     @Override
     @Transactional(readOnly = true)
-    public boolean existsCargoByNomeAndEleicao(String nome, UUID eleicaoId) {
-        return cargoRepository.existsByNomeAndEleicaoId(nome, eleicaoId);
+    public boolean existsCargoByNome(String nome) {
+        return cargoRepository.existsByNome(nome);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isNomeDisponivel(String nome) {
+        return !existsCargoByNome(nome);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isNomeDisponivelParaAtualizacao(String nome, UUID cargoId) {
+        return !cargoRepository.existsByNomeAndIdNot(nome, cargoId);
     }
 
     @Override
     @Transactional(readOnly = true)
     public boolean canDeleteCargo(UUID id) {
-        Cargo cargo = cargoRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Cargo não encontrado com ID: " + id));
-
-        // Não pode deletar se tem candidatos ou votos
-        return cargo.getCandidatos().isEmpty() && cargo.getVotos().isEmpty();
+        // Por enquanto, sempre pode deletar
+        // Futuramente verificar se está sendo usado em candidaturas
+        return cargoRepository.existsById(id);
     }
 
     // === ESTATÍSTICAS ===
 
     @Override
-    @Cacheable(value = "cargo-stats", key = "#eleicaoId")
+    @Cacheable(value = "cargo-stats-total")
     @Transactional(readOnly = true)
-    public long getTotalCargosByEleicao(UUID eleicaoId) {
-        return cargoRepository.countByEleicaoId(eleicaoId);
+    public long getTotalCargos() {
+        return cargoRepository.count();
     }
 
     @Override
-    @Cacheable(value = "cargos-obrigatorios")
+    @Cacheable(value = "cargo-stats-ativos")
     @Transactional(readOnly = true)
-    public List<CargoResponse> getCargosObrigatorios() {
-        List<Cargo> cargos = cargoRepository.findByObrigatorioTrue();
-        return cargoMapper.toResponseList(cargos);
+    public long getTotalCargosAtivos() {
+        return cargoRepository.countByAtivo(true);
+    }
+
+    @Override
+    @Cacheable(value = "cargo-stats-inativos")
+    @Transactional(readOnly = true)
+    public long getTotalCargosInativos() {
+        return cargoRepository.countByAtivo(false);
+    }
+
+    @Override
+    @Cacheable(value = "cargo-stats-disponiveis")
+    @Transactional(readOnly = true)
+    public long getTotalCargosDisponiveis() {
+        return cargoRepository.countCargosDisponiveis();
+    }
+
+    // === UTILITÁRIOS ===
+
+    @Override
+    @Cacheable(value = "cargos-basic-info")
+    @Transactional(readOnly = true)
+    public List<CargoBasicInfo> getCargosBasicInfo() {
+        log.debug("Buscando informações básicas dos cargos ativos");
+
+        List<Cargo> cargos = cargoRepository.findByAtivoTrueOrderByNomeAsc();
+        return cargoMapper.toBasicInfoList(cargos);
+    }
+
+    @Override
+    public void validarDadosCargo(String nome, String descricao) {
+        if (!Cargo.isNomeValido(nome)) {
+            throw new IllegalArgumentException("Nome do cargo inválido. Deve ter entre 3 e 100 caracteres.");
+        }
+
+        if (descricao != null && descricao.length() > 1000) {
+            throw new IllegalArgumentException("Descrição do cargo deve ter no máximo 1000 caracteres.");
+        }
     }
 }

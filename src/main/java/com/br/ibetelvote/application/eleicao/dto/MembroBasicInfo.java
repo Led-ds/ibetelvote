@@ -16,7 +16,8 @@ public class MembroBasicInfo {
     private UUID id;
     private String nome;
     private String email;
-    private String cargo;
-    private String foto;
+    private UUID cargoAtualId;
+    private String nomeCargoAtual;
     private Boolean ativo;
+    private boolean hasUser;
 }

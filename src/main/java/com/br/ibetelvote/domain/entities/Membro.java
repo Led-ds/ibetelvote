@@ -17,7 +17,8 @@ import java.util.UUID;
         @Index(name = "idx_membro_email", columnList = "email", unique = true),
         @Index(name = "idx_membro_nome", columnList = "nome"),
         @Index(name = "idx_membro_ativo", columnList = "ativo"),
-        @Index(name = "idx_membro_user_id", columnList = "user_id", unique = true)
+        @Index(name = "idx_membro_user_id", columnList = "user_id", unique = true),
+        @Index(name = "idx_membro_cargo_atual", columnList = "cargo_atual_id")
 })
 @Getter
 @Setter
@@ -49,10 +50,15 @@ public class Membro {
     @Column(name = "data_nascimento")
     private LocalDate dataNascimento;
 
-    // === DADOS ESPECÍFICOS DA IGREJA ===
-    @Column(name = "cargo", length = 100)
-    private String cargo;
+    // === CARGO ATUAL (REFATORADO) ===
+    @Column(name = "cargo_atual_id")
+    private UUID cargoAtualId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cargo_atual_id", insertable = false, updatable = false)
+    private Cargo cargoAtual;
+
+    // === DADOS ESPECÍFICOS DA IGREJA ===
     @Column(name = "departamento", length = 100)
     private String departamento;
 
@@ -81,7 +87,7 @@ public class Membro {
     @Column(name = "cep", length = 10)
     private String cep;
 
-    // === DADOS DA FOTO (NOVO) ===
+    // === DADOS DA FOTO ===
     @Lob
     @Column(name = "foto_data")
     private byte[] fotoData;
@@ -119,30 +125,24 @@ public class Membro {
     private LocalDateTime updatedAt;
 
     // === MÉTODOS DE NEGÓCIO ===
+
+    /**
+     * Ativa o membro
+     */
     public void activate() {
         this.ativo = true;
     }
 
+    /**
+     * Desativa o membro
+     */
     public void deactivate() {
         this.ativo = false;
     }
 
-    public void updateCompleteProfile(String telefone, String celular, String endereco,
-                                      String cidade, String estado, String cep,
-                                      String cargo, String departamento,
-                                      LocalDate dataBatismo, LocalDate dataMembroDesde) {
-        this.telefone = telefone;
-        this.celular = celular;
-        this.endereco = endereco;
-        this.cidade = cidade;
-        this.estado = estado;
-        this.cep = cep;
-        this.cargo = cargo;
-        this.departamento = departamento;
-        this.dataBatismo = dataBatismo;
-        this.dataMembroDesde = dataMembroDesde;
-    }
-
+    /**
+     * Atualiza perfil básico do membro
+     */
     public void updateBasicProfile(String nome, String email, LocalDate dataNascimento, String cpf) {
         this.nome = nome;
         this.email = email;
@@ -150,13 +150,19 @@ public class Membro {
         this.cpf = cpf;
     }
 
-    public void updateChurchInfo(String cargo, String departamento, LocalDate dataBatismo, LocalDate dataMembroDesde) {
-        this.cargo = cargo;
+    /**
+     * Atualiza informações da igreja
+     */
+    public void updateChurchInfo(UUID cargoAtualId, String departamento, LocalDate dataBatismo, LocalDate dataMembroDesde) {
+        this.cargoAtualId = cargoAtualId;
         this.departamento = departamento;
         this.dataBatismo = dataBatismo;
         this.dataMembroDesde = dataMembroDesde;
     }
 
+    /**
+     * Atualiza informações de contato
+     */
     public void updateContactInfo(String telefone, String celular, String endereco, String cidade, String estado, String cep) {
         this.telefone = telefone;
         this.celular = celular;
@@ -185,17 +191,73 @@ public class Membro {
     }
 
     /**
-     * Retorna a foto como Base64 para envio ao frontend
+     * Atualiza cargo atual do membro
      */
-    @Transient
-    public String getFotoBase64() {
-        if (fotoData != null && fotoData.length > 0) {
-            return "data:" + fotoTipo + ";base64," +
-                    Base64.getEncoder().encodeToString(fotoData);
-        }
-        return null;
+    public void updateCargoAtual(UUID cargoAtualId) {
+        this.cargoAtualId = cargoAtualId;
     }
 
+    /**
+     * Remove cargo atual do membro
+     */
+    public void removeCargoAtual() {
+        this.cargoAtualId = null;
+    }
+
+    /**
+     * Associa membro a um usuário
+     */
+    public void associateUser(UUID userId) {
+        this.userId = userId;
+    }
+
+    /**
+     * Desassocia membro do usuário
+     */
+    public void dissociateUser() {
+        this.userId = null;
+    }
+
+    /**
+     * Atualiza observações
+     */
+    public void updateObservations(String observacoes) {
+        this.observacoes = observacoes;
+    }
+
+    // === MÉTODOS DE VALIDAÇÃO ===
+
+    /**
+     * Verifica se o membro está ativo
+     */
+    public boolean isActive() {
+        return this.ativo != null && this.ativo;
+    }
+
+    /**
+     * Verifica se o membro tem foto
+     */
+    public boolean hasPhoto() {
+        return this.fotoData != null && this.fotoData.length > 0;
+    }
+
+    /**
+     * Verifica se o membro tem usuário associado
+     */
+    public boolean hasUser() {
+        return this.userId != null;
+    }
+
+    /**
+     * Verifica se o membro tem cargo atual
+     */
+    public boolean hasCargoAtual() {
+        return this.cargoAtualId != null;
+    }
+
+    /**
+     * Verifica se pode criar usuário
+     */
     public boolean canCreateUser() {
         return this.ativo &&
                 this.cpf != null && !this.cpf.trim().isEmpty() &&
@@ -203,61 +265,113 @@ public class Membro {
                 this.userId == null;
     }
 
-    public void associateUser(UUID userId) {
-        this.userId = userId;
+    /**
+     * Verifica se o membro pode se candidatar para um cargo específico
+     */
+    public boolean podeSeCandidarPara(Cargo cargoDesejado) {
+        if (!isActive() || cargoDesejado == null || !cargoDesejado.isAtivo()) {
+            return false;
+        }
+
+        // Se não tem cargo atual, só pode se candidatar para Diácono
+        if (!hasCargoAtual()) {
+            return "Diácono".equalsIgnoreCase(cargoDesejado.getNome());
+        }
+
+        // Lógica de hierarquia baseada no cargo atual
+        return validarHierarquiaEletiva(cargoDesejado);
     }
 
-    public void dissociateUser() {
-        this.userId = null;
-    }
+    /**
+     * Valida hierarquia para eleições
+     */
+    private boolean validarHierarquiaEletiva(Cargo cargoDesejado) {
+        if (cargoAtual == null) {
+            return false;
+        }
 
-    public void updateObservations(String observacoes) {
-        this.observacoes = observacoes;
+        String cargoAtualNome = cargoAtual.getNome();
+        String cargoDesejadoNome = cargoDesejado.getNome();
+
+        // Obreiro pode se candidatar apenas para Diácono
+        if ("Obreiro".equalsIgnoreCase(cargoAtualNome)) {
+            return "Diácono".equalsIgnoreCase(cargoDesejadoNome);
+        }
+
+        // Diácono pode se candidatar para Diácono (reeleição) ou Presbítero
+        if ("Diácono".equalsIgnoreCase(cargoAtualNome)) {
+            return "Diácono".equalsIgnoreCase(cargoDesejadoNome) ||
+                    "Presbítero".equalsIgnoreCase(cargoDesejadoNome);
+        }
+
+        // Presbítero pode se candidatar apenas para Presbítero (reeleição)
+        if ("Presbítero".equalsIgnoreCase(cargoAtualNome)) {
+            return "Presbítero".equalsIgnoreCase(cargoDesejadoNome);
+        }
+
+        // Pastor não participa de eleições comuns
+        return false;
     }
 
     // === MÉTODOS UTILITÁRIOS ===
-    public boolean hasUser() {
-        return this.userId != null;
-    }
 
-    public boolean isActive() {
-        return this.ativo;
-    }
-
+    /**
+     * Retorna nome para exibição
+     */
     public String getDisplayName() {
         return this.nome;
     }
 
-    public boolean hasPhoto() {
-        return this.fotoData != null && this.fotoData.length > 0;
+    /**
+     * Retorna foto como Base64 para envio ao frontend
+     */
+    @Transient
+    public String getFotoBase64() {
+        if (hasPhoto()) {
+            return "data:" + fotoTipo + ";base64," +
+                    Base64.getEncoder().encodeToString(fotoData);
+        }
+        return null;
     }
 
+    /**
+     * Retorna nome do cargo atual
+     */
+    public String getNomeCargoAtual() {
+        return cargoAtual != null ? cargoAtual.getNome() : "Sem cargo";
+    }
+
+    /**
+     * Verifica se tem endereço completo
+     */
     public boolean hasCompleteAddress() {
         return this.endereco != null && !this.endereco.trim().isEmpty() &&
                 this.cidade != null && !this.cidade.trim().isEmpty() &&
                 this.estado != null && !this.estado.trim().isEmpty();
     }
 
+    /**
+     * Verifica se tem informações de contato
+     */
     public boolean hasContactInfo() {
         return (this.telefone != null && !this.telefone.trim().isEmpty()) ||
                 (this.celular != null && !this.celular.trim().isEmpty());
     }
 
+    /**
+     * Verifica se perfil básico está completo
+     */
     public boolean isBasicProfileComplete() {
         return this.nome != null && !this.nome.trim().isEmpty() &&
                 this.email != null && !this.email.trim().isEmpty() &&
                 this.cpf != null && !this.cpf.trim().isEmpty() &&
                 this.dataNascimento != null &&
-                this.cargo != null && !this.cargo.trim().isEmpty() &&
                 hasContactInfo();
     }
 
-    public boolean isFullProfileComplete() {
-        return isBasicProfileComplete() &&
-                hasContactInfo() &&
-                hasCompleteAddress();
-    }
-
+    /**
+     * Retorna telefone principal
+     */
     public String getPrimaryPhone() {
         if (this.celular != null && !this.celular.trim().isEmpty()) {
             return this.celular;
@@ -265,6 +379,9 @@ public class Membro {
         return this.telefone;
     }
 
+    /**
+     * Retorna endereço completo
+     */
     public String getFullAddress() {
         if (!hasCompleteAddress()) {
             return null;
@@ -272,6 +389,9 @@ public class Membro {
         return String.format("%s, %s - %s", this.endereco, this.cidade, this.estado);
     }
 
+    /**
+     * Calcula idade aproximada
+     */
     public int getIdadeAproximada() {
         if (this.dataNascimento == null) {
             return 0;
@@ -279,6 +399,9 @@ public class Membro {
         return java.time.Period.between(this.dataNascimento, LocalDate.now()).getYears();
     }
 
+    /**
+     * Calcula tempo como membro
+     */
     public int getTempoComoMembro() {
         if (this.dataMembroDesde == null) {
             return 0;
@@ -286,25 +409,11 @@ public class Membro {
         return java.time.Period.between(this.dataMembroDesde, LocalDate.now()).getYears();
     }
 
-    // === MÉTODOS PARA VALIDAÇÃO ===
-    public boolean isEmailValid() {
-        return this.email != null && this.email.matches("^[A-Za-z0-9+_.-]+@(.+)$");
-    }
+    // === MÉTODOS DE VALIDAÇÃO ESTÁTICOS ===
 
-    public boolean isPhoneValid(String phone) {
-        if (phone == null || phone.trim().isEmpty()) {
-            return true; // Phone is optional
-        }
-        return phone.matches("^\\(\\d{2}\\)\\s\\d{4,5}-\\d{4}$");
-    }
-
-    public boolean isCepValid() {
-        if (this.cep == null || this.cep.trim().isEmpty()) {
-            return true; // CEP is optional
-        }
-        return this.cep.matches("^\\d{5}-?\\d{3}$");
-    }
-
+    /**
+     * Valida CPF
+     */
     public static boolean isValidCPF(String cpf) {
         if (cpf == null) return false;
 
@@ -341,5 +450,11 @@ public class Membro {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    @Override
+    public String toString() {
+        return String.format("Membro{id=%s, nome='%s', cargo='%s', ativo=%s}",
+                id, nome, getNomeCargoAtual(), ativo);
     }
 }

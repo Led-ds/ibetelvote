@@ -22,7 +22,8 @@ public class MembroProfileResponse {
     private LocalDate dataNascimento;
 
     // Igreja
-    private String cargo;
+    private UUID cargoAtualId; // MUDANÇA: era String cargo
+    private String nomeCargoAtual; // ADICIONADO: nome do cargo para exibição
     private String departamento;
     private LocalDate dataBatismo;
     private LocalDate dataMembroDesde;
@@ -37,7 +38,7 @@ public class MembroProfileResponse {
     private String estado;
     private String cep;
 
-    // Foto - Novos campos
+    // Foto
     private String fotoBase64;
     private String fotoTipo;
     private String fotoNome;

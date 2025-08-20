@@ -16,7 +16,8 @@ public class MembroListResponse {
     private UUID id;
     private String nome;
     private String email;
-    private String cargo;
+    private UUID cargoAtualId; // MUDANÇA: era String cargo
+    private String nomeCargoAtual; // ADICIONADO: nome do cargo para exibição
     private String departamento;
     private LocalDate dataNascimento;
     private String fotoBase64;

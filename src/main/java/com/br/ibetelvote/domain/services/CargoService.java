@@ -1,28 +1,125 @@
 package com.br.ibetelvote.domain.services;
 
 import com.br.ibetelvote.application.eleicao.dto.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.UUID;
 
 public interface CargoService {
-
-    // === OPERAÇÕES BÁSICAS ===
+    /**
+     * Cria um novo cargo
+     */
     CargoResponse createCargo(CreateCargoRequest request);
+
+    /**
+     * Busca cargo por ID
+     */
     CargoResponse getCargoById(UUID id);
-    List<CargoResponse> getCargosByEleicaoId(UUID eleicaoId);
+
+    /**
+     * Lista todos os cargos com paginação
+     */
+    Page<CargoResponse> getAllCargos(Pageable pageable);
+
+    /**
+     * Lista todos os cargos
+     */
+    List<CargoResponse> getAllCargos();
+
+    /**
+     * Atualiza um cargo existente
+     */
     CargoResponse updateCargo(UUID id, UpdateCargoRequest request);
+
+    /**
+     * Remove um cargo
+     */
     void deleteCargo(UUID id);
 
-    // === OPERAÇÕES ESPECÍFICAS ===
-    List<CargoResponse> getCargosByEleicaoIdOrdenados(UUID eleicaoId);
-    void reordernarCargos(UUID eleicaoId, List<UUID> cargoIds);
+    /**
+     * Lista cargos ativos
+     */
+    List<CargoResponse> getCargosAtivos();
 
-    // === VALIDAÇÕES ===
-    boolean existsCargoByNomeAndEleicao(String nome, UUID eleicaoId);
+    /**
+     * Lista cargos ativos com paginação
+     */
+    Page<CargoResponse> getCargosAtivos(Pageable pageable);
+
+    /**
+     * Lista cargos inativos
+     */
+    List<CargoResponse> getCargosInativos();
+
+    /**
+     * Busca cargos por nome (busca parcial)
+     */
+    List<CargoResponse> getCargosByNome(String nome);
+
+    /**
+     * Lista cargos disponíveis para eleições
+     */
+    List<CargoResponse> getCargosDisponiveis();
+
+    /**
+     * Ativa um cargo
+     */
+    CargoResponse ativarCargo(UUID id);
+
+    /**
+     * Desativa um cargo
+     */
+    CargoResponse desativarCargo(UUID id);
+
+    /**
+     * Verifica se cargo existe por nome
+     */
+    boolean existsCargoByNome(String nome);
+
+    /**
+     * Verifica se nome está disponível para uso
+     */
+    boolean isNomeDisponivel(String nome);
+
+    /**
+     * Verifica se nome está disponível para atualização
+     */
+    boolean isNomeDisponivelParaAtualizacao(String nome, UUID cargoId);
+
+    /**
+     * Verifica se cargo pode ser removido
+     */
     boolean canDeleteCargo(UUID id);
 
-    // === ESTATÍSTICAS ===
-    long getTotalCargosByEleicao(UUID eleicaoId);
-    List<CargoResponse> getCargosObrigatorios();
+    /**
+     * Conta total de cargos
+     */
+    long getTotalCargos();
+
+    /**
+     * Conta cargos ativos
+     */
+    long getTotalCargosAtivos();
+
+    /**
+     * Conta cargos inativos
+     */
+    long getTotalCargosInativos();
+
+    /**
+     * Conta cargos disponíveis para eleições
+     */
+    long getTotalCargosDisponiveis();
+
+    /**
+     * Retorna informações básicas de todos os cargos ativos
+     */
+    List<CargoBasicInfo> getCargosBasicInfo();
+
+    /**
+     * Valida se dados do cargo são válidos
+     */
+    void validarDadosCargo(String nome, String descricao);
 }

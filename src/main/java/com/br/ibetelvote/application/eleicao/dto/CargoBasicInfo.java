@@ -15,9 +15,6 @@ public class CargoBasicInfo {
 
     private UUID id;
     private String nome;
-    private Integer maxVotos;
-    private Integer ordemVotacao;
-    private Boolean obrigatorio;
-    private int totalCandidatos;
-    private int totalVotos;
+    private Boolean ativo;
+    private String status;
 }

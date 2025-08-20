@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -12,7 +14,8 @@ import lombok.NoArgsConstructor;
 public class MembroFilterRequest {
     private String nome;
     private String email;
-    private String cargo;
+    private UUID cargoAtualId; // MUDANÇA: era String cargo, agora UUID cargoAtualId
+    private String nomeCargo; // ADICIONADO: para busca por nome do cargo
     private Boolean ativo;
     private Boolean hasUser;
     private int page = 0;
