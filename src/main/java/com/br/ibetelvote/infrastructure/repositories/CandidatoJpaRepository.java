@@ -54,6 +54,28 @@ public interface CandidatoJpaRepository extends JpaRepository<Candidato, UUID>, 
     List<Candidato> findByEleicaoIdAndAprovadoTrue(UUID eleicaoId);
     List<Candidato> findByEleicaoIdAndAtivoTrueAndAprovadoTrue(UUID eleicaoId);
 
+    List<Candidato> findByCargoPretendidoIdAndEleicaoIdAndAtivoTrueAndAprovadoTrue(UUID cargoId, UUID eleicaoId);
+
+    List<Candidato> findByCargoPretendidoIdAndAtivoTrueAndAprovadoTrue(UUID cargoId);
+
+    long countByEleicaoIdAndAtivoTrue(UUID eleicaoId);
+
+    long countByEleicaoIdAndAprovadoTrue(UUID eleicaoId);
+
+    long countByEleicaoIdAndAprovadoFalse(UUID eleicaoId);
+
+    long countByEleicaoIdAndAtivoFalse(UUID eleicaoId);
+
+    /**
+     * ✅ CORRIGIDO: Busca candidatos não aprovados por eleição
+     */
+    List<Candidato> findByEleicaoIdAndAprovadoFalse(UUID eleicaoId);
+
+    /**
+     * ✅ CORRIGIDO: Busca candidatos inativos por eleição
+     */
+    List<Candidato> findByEleicaoIdAndAtivoFalse(UUID eleicaoId);
+
     // === CONSULTAS POR NÚMERO ===
     Optional<Candidato> findByNumeroCandidato(String numeroCandidato);
     Optional<Candidato> findByNumeroCandidatoAndEleicaoId(String numeroCandidato, UUID eleicaoId);

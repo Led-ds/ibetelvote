@@ -1,7 +1,8 @@
 package com.br.ibetelvote.application.services;
 
-import com.br.ibetelvote.application.eleicao.dto.*;
 import com.br.ibetelvote.application.mapper.VotoMapper;
+import com.br.ibetelvote.application.voto.dto.VotarRequest;
+import com.br.ibetelvote.application.voto.dto.VotoResponse;
 import com.br.ibetelvote.domain.entities.*;
 import com.br.ibetelvote.domain.services.VotoService;
 import com.br.ibetelvote.infrastructure.repositories.*;
@@ -72,7 +73,6 @@ public class VotoServiceImpl implements VotoService {
         } else if (Boolean.TRUE.equals(votoIndividual.getVotoNulo())) {
             voto = Voto.criarVotoNulo(membroId, eleicaoId, votoIndividual.getCargoId());
         } else if (votoIndividual.getCandidatoId() != null) {
-            // Validar se candidato existe e pode receber votos
             Candidato candidato = candidatoRepository.findById(votoIndividual.getCandidatoId())
                     .orElseThrow(() -> new IllegalArgumentException("Candidato não encontrado"));
 
@@ -80,7 +80,12 @@ public class VotoServiceImpl implements VotoService {
                 throw new IllegalArgumentException("Candidato não está disponível para receber votos");
             }
 
-            voto = Voto.criarVotoValido(membroId, eleicaoId, votoIndividual.getCargoId(), votoIndividual.getCandidatoId());
+            if (!candidato.getCargoPretendidoId().equals(votoIndividual.getCargoId())) {
+                throw new IllegalArgumentException("Candidato não pertence ao cargo especificado");
+            }
+
+            voto = Voto.criarVotoValido(membroId, eleicaoId, votoIndividual.getCandidatoId());
+            voto.definirCargoPretendidoPorCandidato(candidato);
         } else {
             throw new IllegalArgumentException("Tipo de voto inválido");
         }
@@ -90,13 +95,10 @@ public class VotoServiceImpl implements VotoService {
         String hash = Voto.gerarHashVoto(membroId, voto.getCandidatoId(), LocalDateTime.now());
         voto.definirHashSeguranca(hash);
 
-        // Validar consistência
-        voto.validarConsistencia();
+        voto.validarVotoCompleto();
 
         return votoRepository.save(voto);
     }
-
-    // === CONSULTAS POR MEMBRO ===
 
     @Override
     @Transactional(readOnly = true)
@@ -115,11 +117,9 @@ public class VotoServiceImpl implements VotoService {
 
     @Override
     @Transactional(readOnly = true)
-    public boolean membroJaVotouNoCargo(UUID membroId, UUID cargoId, UUID eleicaoId) {
-        return votoRepository.existsByMembroIdAndCargoIdAndEleicaoId(membroId, cargoId, eleicaoId);
+    public boolean membroJaVotouNoCargo(UUID membroId, UUID cargoPretendidoId, UUID eleicaoId) {
+        return votoRepository.existsByMembroIdAndCargoPretendidoIdAndEleicaoId(membroId, cargoPretendidoId, eleicaoId);
     }
-
-    // === CONSULTAS POR ELEIÇÃO ===
 
     @Override
     @Cacheable(value = "votos-eleicao", key = "#eleicaoId")
@@ -138,26 +138,22 @@ public class VotoServiceImpl implements VotoService {
         return votoRepository.countByEleicaoId(eleicaoId);
     }
 
-    // === CONSULTAS POR CARGO ===
-
     @Override
-    @Cacheable(value = "votos-cargo", key = "#cargoId")
+    @Cacheable(value = "votos-cargo", key = "#cargoPretendidoId")
     @Transactional(readOnly = true)
-    public List<VotoResponse> getVotosByCargoId(UUID cargoId) {
-        log.debug("Buscando votos do cargo: {}", cargoId);
+    public List<VotoResponse> getVotosByCargoPretendidoId(UUID cargoPretendidoId) {
+        log.debug("Buscando votos do cargo pretendido: {}", cargoPretendidoId);
 
-        List<Voto> votos = votoRepository.findByCargoId(cargoId);
+        List<Voto> votos = votoRepository.findByCargoPretendidoId(cargoPretendidoId);
         return votoMapper.toResponseList(votos);
     }
 
     @Override
-    @Cacheable(value = "voto-stats", key = "'total-cargo-' + #cargoId")
+    @Cacheable(value = "voto-stats", key = "'total-cargo-' + #cargoPretendidoId")
     @Transactional(readOnly = true)
-    public long getTotalVotosByCargo(UUID cargoId) {
-        return votoRepository.countByCargoId(cargoId);
+    public long getTotalVotosByCargoPretendido(UUID cargoPretendidoId) {
+        return votoRepository.countByCargoPretendidoId(cargoPretendidoId);
     }
-
-    // === CONSULTAS POR CANDIDATO ===
 
     @Override
     @Cacheable(value = "votos-candidato", key = "#candidatoId")
@@ -176,7 +172,20 @@ public class VotoServiceImpl implements VotoService {
         return votoRepository.countByCandidatoId(candidatoId);
     }
 
-    // === RELATÓRIOS E ESTATÍSTICAS ===
+    @Override
+    @Deprecated
+    @Transactional(readOnly = true)
+    public List<VotoResponse> getVotosByCargoId(UUID cargoId) {
+        log.debug("Buscando votos do cargo (método deprecated): {}", cargoId);
+        return getVotosByCargoPretendidoId(cargoId);
+    }
+
+    @Override
+    @Deprecated
+    @Transactional(readOnly = true)
+    public long getTotalVotosByCargo(UUID cargoId) {
+        return getTotalVotosByCargoPretendido(cargoId);
+    }
 
     @Override
     @Cacheable(value = "estatisticas-votacao", key = "#eleicaoId")
@@ -186,30 +195,27 @@ public class VotoServiceImpl implements VotoService {
 
         Map<String, Long> stats = new HashMap<>();
 
-        List<Voto> votos = votoRepository.findByEleicaoId(eleicaoId);
-
-        stats.put("totalVotos", (long) votos.size());
-        stats.put("votosValidos", votos.stream().filter(Voto::isVotoValido).count());
-        stats.put("votosBranco", votos.stream().filter(Voto::isVotoBranco).count());
-        stats.put("votosNulo", votos.stream().filter(Voto::isVotoNulo).count());
+        stats.put("totalVotos", votoRepository.countByEleicaoId(eleicaoId));
+        stats.put("votosValidos", votoRepository.countVotosValidosByEleicao(eleicaoId));
+        stats.put("votosBranco", votoRepository.countByEleicaoIdAndVotoBrancoTrue(eleicaoId));
+        stats.put("votosNulo", votoRepository.countByEleicaoIdAndVotoNuloTrue(eleicaoId));
+        stats.put("votantesUnicos", votoRepository.countVotantesUnicosByEleicao(eleicaoId));
 
         return stats;
     }
 
     @Override
-    @Cacheable(value = "estatisticas-cargo", key = "#cargoId")
+    @Cacheable(value = "estatisticas-cargo", key = "#cargoPretendidoId")
     @Transactional(readOnly = true)
-    public Map<String, Long> getEstatisticasPorCargo(UUID cargoId) {
-        log.debug("Gerando estatísticas do cargo: {}", cargoId);
+    public Map<String, Long> getEstatisticasPorCargo(UUID cargoPretendidoId) {
+        log.debug("Gerando estatísticas do cargo pretendido: {}", cargoPretendidoId);
 
         Map<String, Long> stats = new HashMap<>();
 
-        List<Voto> votos = votoRepository.findByCargoId(cargoId);
-
-        stats.put("totalVotos", (long) votos.size());
-        stats.put("votosValidos", votos.stream().filter(Voto::isVotoValido).count());
-        stats.put("votosBranco", votos.stream().filter(Voto::isVotoBranco).count());
-        stats.put("votosNulo", votos.stream().filter(Voto::isVotoNulo).count());
+        stats.put("totalVotos", votoRepository.countByCargoPretendidoId(cargoPretendidoId));
+        stats.put("votosValidos", votoRepository.countVotosValidosByCargoPretendido(cargoPretendidoId));
+        stats.put("votosBranco", votoRepository.countByCargoPretendidoIdAndVotoBrancoTrue(cargoPretendidoId));
+        stats.put("votosNulo", votoRepository.countByCargoPretendidoIdAndVotoNuloTrue(cargoPretendidoId));
 
         return stats;
     }
@@ -220,13 +226,14 @@ public class VotoServiceImpl implements VotoService {
     public List<Map<String, Object>> getResultadosPorCandidato(UUID eleicaoId) {
         log.debug("Gerando resultados por candidato para eleição: {}", eleicaoId);
 
-        List<Object[]> resultados = votoRepository.countVotosByCandidatoAndCargo(eleicaoId);
+        List<Object[]> resultados = votoRepository.countVotosByCandidatoAndCargoPretendido(eleicaoId);
 
         return resultados.stream()
                 .map(resultado -> {
                     Map<String, Object> item = new HashMap<>();
                     item.put("nomeCandidato", resultado[0]);
-                    item.put("totalVotos", resultado[1]);
+                    item.put("nomeCargo", resultado[1]);
+                    item.put("totalVotos", resultado[2]);
                     return item;
                 })
                 .collect(Collectors.toList());
@@ -249,8 +256,6 @@ public class VotoServiceImpl implements VotoService {
                 })
                 .collect(Collectors.toList());
     }
-
-    // === VALIDAÇÕES ===
 
     @Override
     @Transactional(readOnly = true)
@@ -316,15 +321,14 @@ public class VotoServiceImpl implements VotoService {
                 }
                 cargosVotados.add(voto.getCargoId());
 
-                // Validar cargo
                 Cargo cargo = cargoRepository.findById(voto.getCargoId()).orElse(null);
                 if (cargo == null) {
                     erros.add("Cargo não encontrado: " + voto.getCargoId());
                     continue;
                 }
 
-                if (!cargo.getEleicaoId().equals(request.getEleicaoId())) {
-                    erros.add("Cargo não pertence à eleição especificada");
+                if (!cargo.isAtivo()) {
+                    erros.add("Cargo não está ativo para votação");
                     continue;
                 }
 
@@ -339,21 +343,24 @@ public class VotoServiceImpl implements VotoService {
                     continue;
                 }
 
-                // Validar voto branco se permitido
-                if (Boolean.TRUE.equals(voto.getVotoBranco()) && !cargo.permiteVotoBranco()) {
-                    erros.add("Cargo não permite voto em branco");
-                }
-
                 // Validar candidato se foi especificado
                 if (voto.getCandidatoId() != null) {
                     Candidato candidato = candidatoRepository.findById(voto.getCandidatoId()).orElse(null);
                     if (candidato == null) {
                         erros.add("Candidato não encontrado: " + voto.getCandidatoId());
-                    } else if (!candidato.getCargoId().equals(voto.getCargoId())) {
-                        erros.add("Candidato não pertence ao cargo especificado");
-                    } else if (!candidato.podeReceberVotos()) {
-                        erros.add("Candidato não está disponível para receber votos");
+                    } else {
+                        if (!candidato.getCargoPretendidoId().equals(voto.getCargoId())) {
+                            erros.add("Candidato não pertence ao cargo especificado");
+                        } else if (!candidato.podeReceberVotos()) {
+                            erros.add("Candidato não está disponível para receber votos");
+                        } else if (!candidato.getEleicaoId().equals(request.getEleicaoId())) {
+                            erros.add("Candidato não pertence à eleição especificada");
+                        }
                     }
+                }
+
+                if (voto.getCandidatoId() != null) {
+                    erros.addAll(validarHierarquiaVotacao(membro, cargo));
                 }
             }
         }
@@ -361,7 +368,15 @@ public class VotoServiceImpl implements VotoService {
         return erros;
     }
 
-    // === AUDITORIA ===
+    private List<String> validarHierarquiaVotacao(Membro membro, Cargo cargoVotacao) {
+        List<String> erros = new ArrayList<>();
+
+        // TODO: Implementar validações específicas se necessário
+        // Por exemplo: Verificar se membro pode votar em determinados cargos
+        // baseado na hierarquia eclesiástica
+
+        return erros;
+    }
 
     @Override
     @Cacheable(value = "voto-stats", key = "'total-validos'")
@@ -389,9 +404,78 @@ public class VotoServiceImpl implements VotoService {
     public List<VotoResponse> getVotosParaAuditoria(UUID eleicaoId) {
         log.debug("Gerando dados de auditoria para eleição: {}", eleicaoId);
 
-        List<Voto> votos = votoRepository.findByEleicaoId(eleicaoId);
+        List<Voto> votos = votoRepository.findVotosParaAuditoria(eleicaoId);
         return votos.stream()
                 .map(votoMapper::toAuditResponse) // Remove dados sensíveis
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, Object> getResumoVotacaoDetalhado(UUID eleicaoId) {
+        log.debug("Gerando resumo detalhado para eleição: {}", eleicaoId);
+
+        Map<String, Object> resumo = new HashMap<>();
+
+        // Estatísticas gerais
+        resumo.put("estatisticasGerais", getEstatisticasVotacao(eleicaoId));
+
+        // Distribuição por tipo
+        List<Object[]> distribuicao = votoRepository.findDistribuicaoVotosPorTipo(eleicaoId);
+        resumo.put("distribuicaoTipos", distribuicao);
+
+        // Resumo por cargo
+        List<Object[]> resumoPorCargo = votoRepository.getResumoVotacaoPorCargo(eleicaoId);
+        resumo.put("resumoPorCargo", resumoPorCargo);
+
+        // Participação por cargo do membro
+        List<Object[]> participacao = votoRepository.getParticipacaoPorCargoMembro(eleicaoId);
+        resumo.put("participacaoPorCargo", participacao);
+
+        return resumo;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getRankingCandidatosPorCargo(UUID eleicaoId, UUID cargoPretendidoId) {
+        log.debug("Gerando ranking de candidatos - Eleição: {}, Cargo: {}", eleicaoId, cargoPretendidoId);
+
+        List<Object[]> ranking = votoRepository.findRankingCandidatosPorVotos(eleicaoId, cargoPretendidoId);
+
+        return ranking.stream()
+                .map(item -> {
+                    Map<String, Object> candidato = new HashMap<>();
+                    candidato.put("nomeCandidato", item[0]);
+                    candidato.put("numeroCandidato", item[1]);
+                    candidato.put("totalVotos", item[2]);
+                    return candidato;
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, Object> getAnaliseSeguranca(UUID eleicaoId) {
+        log.debug("Analisando segurança da votação: {}", eleicaoId);
+
+        Map<String, Object> analise = new HashMap<>();
+
+        // Votos suspeitos por IP
+        List<Object[]> votosSuspeitos = votoRepository.findVotosSuspeitos(eleicaoId);
+        analise.put("votosSuspeitosPorIP", votosSuspeitos);
+
+        // Votos com hash duplicado
+        List<Voto> hashDuplicados = votoRepository.findVotosComHashDuplicado();
+        analise.put("votosComHashDuplicado", hashDuplicados.size());
+
+        // Votos com dados incompletos
+        List<Voto> dadosIncompletos = votoRepository.findVotosComDadosIncompletos();
+        analise.put("votosComDadosIncompletos", dadosIncompletos.size());
+
+        // Análise por IP
+        List<Object[]> votosPorIP = votoRepository.countVotosPorIpOrigem(eleicaoId);
+        analise.put("distribuicaoPorIP", votosPorIP);
+
+        return analise;
     }
 }
