@@ -1,5 +1,6 @@
 package com.br.ibetelvote.application.membro.dto;
 
+import com.br.ibetelvote.application.eleicao.dto.CargoBasicInfo;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,16 +18,21 @@ public class MembroResponse {
 
     private UUID id;
     private String nome;
+    private String cpf;
     private String email;
     private LocalDate dataNascimento;
 
+    // Cargo atual
+    private UUID cargoAtualId;
+    private CargoBasicInfo cargoAtual;
+    private String nomeCargoAtual;
+
     // Dados da igreja
-    private String cargo;
     private String departamento;
     private LocalDate dataBatismo;
     private LocalDate dataMembroDesde;
 
-    // Contato
+    // Dados de contato
     private String telefone;
     private String celular;
     private String endereco;
@@ -34,32 +40,33 @@ public class MembroResponse {
     private String estado;
     private String cep;
 
-    //Foto
-    private String fotoBase64;
-    private String fotoTipo;
-    private String fotoNome;
+    // Foto
+    private boolean hasPhoto;
+    private String fotoBase64; // Apenas quando necessário
 
-    // Outros
-    private String foto;
+    // Observações
     private String observacoes;
+
+    // Controle
     private Boolean ativo;
 
-    // Relacionamento
+    // User
     private UUID userId;
-    private UserBasicInfo user;
+    private boolean hasUser;
 
     // Auditoria
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
     // Campos computados
+    private String displayName;
     private String primaryPhone;
     private String fullAddress;
-    private boolean hasUser;
-    private boolean hasPhoto;
-    private boolean hasCompleteAddress;
-    private boolean hasContactInfo;
-    private boolean isProfileComplete;
     private int idadeAproximada;
     private int tempoComoMembro;
+    private boolean basicProfileComplete;
+    private boolean hasCompleteAddress;
+    private boolean hasContactInfo;
+    private boolean canCreateUser;
+    private boolean hasCargoAtual;
 }

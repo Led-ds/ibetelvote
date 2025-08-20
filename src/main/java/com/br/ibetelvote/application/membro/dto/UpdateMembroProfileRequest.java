@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Data
 @Builder
@@ -26,7 +27,7 @@ public class UpdateMembroProfileRequest {
     private LocalDate dataNascimento;
 
     // Dados da igreja
-    private String cargo;
+    private UUID cargoAtualId; // MUDANÇA: era String cargo
     private String departamento;
     private LocalDate dataBatismo;
     private LocalDate dataMembroDesde;

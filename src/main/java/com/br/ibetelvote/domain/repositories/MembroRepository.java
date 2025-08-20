@@ -10,54 +10,69 @@ import java.util.UUID;
 
 public interface MembroRepository {
 
-    Optional<Membro> findByEmail(String email);
-    Optional<Membro> findByUserId(UUID userId);
-    Page<Membro> findAll(Pageable pageable);
+    // === OPERAÇÕES BÁSICAS ===
     void deleteById(UUID id);
     boolean existsById(UUID id);
-    boolean existsByEmail(String email);
-    boolean existsByEmailAndIdNot(String email, UUID id);
-    boolean existsByUserId(UUID userId);
     long count();
 
-    // Consultas por Status
-    Page<Membro> findByAtivoTrue(Pageable pageable);
-    long countByAtivoTrue();
+    // === CONSULTAS POR STATUS ===
+    List<Membro> findByAtivoTrue();
+    List<Membro> findByAtivoFalse();
+    Page<Membro> findByAtivo(Boolean ativo, Pageable pageable);
+    long countByAtivo(Boolean ativo);
 
-    // Consultas por filtros
-    Page<Membro> findByNomeContainingIgnoreCase(String nome, Pageable pageable);
-    Page<Membro> findByEmailContainingIgnoreCase(String email, Pageable pageable);
-    Page<Membro> findByCargoContainingIgnoreCase(String cargo, Pageable pageable);
-
-    // Consultas específicas
-    List<Membro> findByUserIdIsNull(); // Membros sem usuário
-    List<Membro> findByUserIdIsNotNull(); // Membros com usuário
-    List<Membro> findByFotoDataIsNull(); // Membros sem foto
-    List<Membro> findMembrosWithIncompleteProfile();
-
-    // Consultas com filtros dinâmicos
-    Page<Membro> findByFilters(String nome, String email, String cargo, Boolean ativo, Boolean hasUser, Pageable pageable);
-
-    // ✅ NOVOS MÉTODOS PARA AUTO-CADASTRO
-
-    /**
-     * Busca um membro pelo email E CPF (ambos devem coincidir)
-     * Usado para validação no auto-cadastro
-     */
-    Optional<Membro> findByEmailAndCpf(String email, String cpf);
-
-    /**
-     * Busca membro por CPF
-     */
+    // === CONSULTAS POR DADOS PESSOAIS ===
+    Optional<Membro> findByEmail(String email);
     Optional<Membro> findByCpf(String cpf);
-
-    /**
-     * Verifica se já existe um membro com o CPF informado
-     */
+    boolean existsByEmail(String email);
     boolean existsByCpf(String cpf);
+    List<Membro> findByNomeContainingIgnoreCase(String nome);
+
+    // === CONSULTAS POR CARGO ===
+    List<Membro> findByCargoAtualId(UUID cargoId);
+    List<Membro> findByCargoAtualIdIsNull();
+    List<Membro> findByCargoAtualIdIsNotNull();
+    Page<Membro> findByCargoAtualId(UUID cargoId, Pageable pageable);
+    long countByCargoAtualId(UUID cargoId);
+
+    // === CONSULTAS POR USER ===
+    Optional<Membro> findByUserId(UUID userId);
+    List<Membro> findByUserIdIsNull();
+    List<Membro> findByUserIdIsNotNull();
+    boolean existsByUserId(UUID userId);
+
+    // === CONSULTAS ORDENADAS ===
+    List<Membro> findAllByOrderByNomeAsc();
+    List<Membro> findByAtivoTrueOrderByNomeAsc();
+    Page<Membro> findByAtivoTrueOrderByNomeAsc(Pageable pageable);
+
+    // === CONSULTAS PARA VALIDAÇÃO ===
+    boolean existsByEmailAndIdNot(String email, UUID id);
+    boolean existsByCpfAndIdNot(String cpf, UUID id);
+
+    // === CONSULTAS CUSTOMIZADAS ===
+    /**
+     * Busca membros aptos para votação (ativos com informações completas)
+     */
+    List<Membro> findMembrosAptosParaVotacao();
 
     /**
-     * Verifica se existe membro com CPF diferente do ID informado
+     * Busca membros elegíveis para candidatura a um cargo específico
      */
-    boolean existsByCpfAndIdNot(String cpf, UUID id);
+    List<Membro> findMembrosElegiveisParaCargo(String nomeCargo);
+
+    /**
+     * Conta membros por cargo
+     */
+    long countMembrosPorCargo(UUID cargoId);
+
+    /**
+     * Busca membros sem cargo definido
+     */
+    List<Membro> findMembrosSemCargo();
+
+    /**
+     * Busca membros com perfil completo
+     */
+    List<Membro> findMembrosComPerfilCompleto();
 }

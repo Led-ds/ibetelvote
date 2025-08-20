@@ -16,103 +16,135 @@ import java.util.UUID;
 @Repository
 public interface MembroJpaRepository extends JpaRepository<Membro, UUID>, MembroRepository {
 
-    @Override
-    Optional<Membro> findByEmail(String email);
+    // === OPERAÇÕES BÁSICAS ===
+    // Métodos básicos herdados do JpaRepository
 
-    @Override
-    Optional<Membro> findByUserId(UUID userId);
+    // === CONSULTAS POR STATUS ===
+    List<Membro> findByAtivoTrue();
+    List<Membro> findByAtivoFalse();
+    Page<Membro> findByAtivo(Boolean ativo, Pageable pageable);
+    long countByAtivo(Boolean ativo);
 
-    @Override
-    boolean existsByEmail(String email);
+    // === CONSULTAS POR DADOS PESSOAIS ===
+    @Query("SELECT m FROM Membro m WHERE UPPER(m.email) = UPPER(:email)")
+    Optional<Membro> findByEmail(@Param("email") String email);
 
-    @Override
-    boolean existsByEmailAndIdNot(String email, UUID id);
-
-    @Override
-    boolean existsByUserId(UUID userId);
-
-    @Override
-    Page<Membro> findByAtivoTrue(Pageable pageable);
-
-    @Override
-    long countByAtivoTrue();
-
-    @Override
-    Page<Membro> findByNomeContainingIgnoreCase(String nome, Pageable pageable);
-
-    @Override
-    Page<Membro> findByEmailContainingIgnoreCase(String email, Pageable pageable);
-
-    @Override
-    Page<Membro> findByCargoContainingIgnoreCase(String cargo, Pageable pageable);
-
-    @Override
-    List<Membro> findByUserIdIsNull();
-
-    @Override
-    List<Membro> findByUserIdIsNotNull();
-
-    @Override
-    List<Membro> findByFotoDataIsNull();
-
-    @Override
-    @Query("SELECT m FROM Membro m WHERE " +
-            "m.nome IS NULL OR m.nome = '' OR " +
-            "m.email IS NULL OR m.email = '' OR " +
-            "m.dataNascimento IS NULL OR " +
-            "m.cargo IS NULL OR m.cargo = '' OR " +
-            "(m.telefone IS NULL OR m.telefone = '') AND (m.celular IS NULL OR m.celular = '')")
-    List<Membro> findMembrosWithIncompleteProfile();
-
-    @Override
-    @Query(value = "SELECT * FROM membros m WHERE " +
-            "(:nome IS NULL OR LOWER(m.nome) LIKE LOWER(CONCAT('%', :nome, '%'))) AND " +
-            "(:email IS NULL OR LOWER(m.email) LIKE LOWER(CONCAT('%', :email, '%'))) AND " +
-            "(:cargo IS NULL OR LOWER(m.cargo) LIKE LOWER(CONCAT('%', :cargo, '%'))) AND " +
-            "(:ativo IS NULL OR m.ativo = :ativo) AND " +
-            "(:hasUser IS NULL OR " +
-            "  (:hasUser = true AND m.user_id IS NOT NULL) OR " +
-            "  (:hasUser = false AND m.user_id IS NULL)) " +
-            "ORDER BY m.nome",
-            nativeQuery = true)
-    Page<Membro> findByFilters(@Param("nome") String nome,
-                               @Param("email") String email,
-                               @Param("cargo") String cargo,
-                               @Param("ativo") Boolean ativo,
-                               @Param("hasUser") Boolean hasUser,
-                               Pageable pageable);
-
-    // Consultas com JOIN para User
-    @Query("SELECT m FROM Membro m LEFT JOIN FETCH m.user WHERE m.id = :id")
-    Optional<Membro> findByIdWithUser(@Param("id") UUID id);
-
-    @Query("SELECT m FROM Membro m LEFT JOIN FETCH m.user WHERE m.email = :email")
-    Optional<Membro> findByEmailWithUser(@Param("email") String email);
-
-    // ✅ MÉTODO FALTANTE ADICIONADO
-    /**
-     * Busca um membro pelo email E CPF (ambos devem coincidir)
-     * Usado para validação no auto-cadastro
-     */
-    @Query("SELECT m FROM Membro m WHERE m.email = :email AND m.cpf = :cpf")
-    Optional<Membro> findByEmailAndCpf(@Param("email") String email, @Param("cpf") String cpf);
-
-    // ✅ MÉTODOS ADICIONAIS ÚTEIS PARA AUTO-CADASTRO
-
-    /**
-     * Busca membro por CPF
-     */
     Optional<Membro> findByCpf(String cpf);
 
-    /**
-     * Verifica se já existe um membro com o CPF informado
-     */
+    @Query("SELECT CASE WHEN COUNT(m) > 0 THEN true ELSE false END FROM Membro m WHERE UPPER(m.email) = UPPER(:email)")
+    boolean existsByEmail(@Param("email") String email);
+
     boolean existsByCpf(String cpf);
 
-    /**
-     * Verifica se existe membro com CPF diferente do ID informado
-     */
-    boolean existsByCpfAndIdNot(String cpf, UUID id);
+    @Query("SELECT m FROM Membro m WHERE UPPER(m.nome) LIKE UPPER(CONCAT('%', :nome, '%'))")
+    List<Membro> findByNomeContainingIgnoreCase(@Param("nome") String nome);
 
-    boolean existsById(UUID id);
+    // === CONSULTAS POR CARGO ===
+    List<Membro> findByCargoAtualId(UUID cargoId);
+
+    @Query("SELECT m FROM Membro m WHERE m.cargoAtualId IS NULL")
+    List<Membro> findByCargoAtualIdIsNull();
+
+    @Query("SELECT m FROM Membro m WHERE m.cargoAtualId IS NOT NULL")
+    List<Membro> findByCargoAtualIdIsNotNull();
+
+    Page<Membro> findByCargoAtualId(UUID cargoId, Pageable pageable);
+
+    long countByCargoAtualId(UUID cargoId);
+
+    // === CONSULTAS POR USER ===
+    Optional<Membro> findByUserId(UUID userId);
+
+    @Query("SELECT m FROM Membro m WHERE m.userId IS NULL")
+    List<Membro> findByUserIdIsNull();
+
+    @Query("SELECT m FROM Membro m WHERE m.userId IS NOT NULL")
+    List<Membro> findByUserIdIsNotNull();
+
+    boolean existsByUserId(UUID userId);
+
+    // === CONSULTAS ORDENADAS ===
+    List<Membro> findAllByOrderByNomeAsc();
+    List<Membro> findByAtivoTrueOrderByNomeAsc();
+    Page<Membro> findByAtivoTrueOrderByNomeAsc(Pageable pageable);
+
+    // === CONSULTAS PARA VALIDAÇÃO ===
+    @Query("SELECT CASE WHEN COUNT(m) > 0 THEN true ELSE false END FROM Membro m WHERE UPPER(m.email) = UPPER(:email) AND m.id != :id")
+    boolean existsByEmailAndIdNot(@Param("email") String email, @Param("id") UUID id);
+
+    @Query("SELECT CASE WHEN COUNT(m) > 0 THEN true ELSE false END FROM Membro m WHERE m.cpf = :cpf AND m.id != :id")
+    boolean existsByCpfAndIdNot(@Param("cpf") String cpf, @Param("id") UUID id);
+
+    // === CONSULTAS CUSTOMIZADAS ===
+
+    /**
+     * Busca membros aptos para votação (ativos com informações completas)
+     */
+    @Query("SELECT m FROM Membro m WHERE m.ativo = true AND m.nome IS NOT NULL AND m.email IS NOT NULL AND m.cpf IS NOT NULL ORDER BY m.nome")
+    List<Membro> findMembrosAptosParaVotacao();
+
+    /**
+     * Busca membros elegíveis para candidatura a um cargo específico
+     * Baseado na hierarquia: Obreiro->Diácono, Diácono->Diácono/Presbítero, Presbítero->Presbítero
+     */
+    @Query("SELECT m FROM Membro m JOIN m.cargoAtual c WHERE m.ativo = true AND " +
+            "(:nomeCargo = 'Diácono' AND (c.nome = 'Obreiro' OR c.nome = 'Diácono')) OR " +
+            "(:nomeCargo = 'Presbítero' AND (c.nome = 'Diácono' OR c.nome = 'Presbítero')) " +
+            "ORDER BY m.nome")
+    List<Membro> findMembrosElegiveisParaCargo(@Param("nomeCargo") String nomeCargo);
+
+    /**
+     * Conta membros por cargo
+     */
+    @Query("SELECT COUNT(m) FROM Membro m WHERE m.cargoAtualId = :cargoId AND m.ativo = true")
+    long countMembrosPorCargo(@Param("cargoId") UUID cargoId);
+
+    /**
+     * Busca membros sem cargo definido
+     */
+    @Query("SELECT m FROM Membro m WHERE m.cargoAtualId IS NULL AND m.ativo = true ORDER BY m.nome")
+    List<Membro> findMembrosSemCargo();
+
+    /**
+     * Busca membros com perfil completo
+     */
+    @Query("SELECT m FROM Membro m WHERE m.ativo = true AND m.nome IS NOT NULL AND m.email IS NOT NULL AND " +
+            "m.cpf IS NOT NULL AND m.dataNascimento IS NOT NULL AND " +
+            "(m.telefone IS NOT NULL OR m.celular IS NOT NULL) ORDER BY m.nome")
+    List<Membro> findMembrosComPerfilCompleto();
+
+    // === CONSULTAS ESTATÍSTICAS ===
+
+    /**
+     * Conta membros ativos por departamento
+     */
+    @Query("SELECT m.departamento, COUNT(m) FROM Membro m WHERE m.ativo = true AND m.departamento IS NOT NULL GROUP BY m.departamento")
+    List<Object[]> countMembrosPorDepartamento();
+
+    /**
+     * Busca membros que podem criar usuário
+     */
+    @Query("SELECT m FROM Membro m WHERE m.ativo = true AND m.cpf IS NOT NULL AND m.email IS NOT NULL AND m.userId IS NULL ORDER BY m.nome")
+    List<Membro> findMembrosQuePodemCriarUsuario();
+
+    /**
+     * Busca membros por período de cadastro
+     */
+    @Query("SELECT m FROM Membro m WHERE m.dataMembroDesde >= :dataInicio AND m.dataMembroDesde <= :dataFim ORDER BY m.dataMembroDesde DESC")
+    List<Membro> findMembrosPorPeriodoIngresso(@Param("dataInicio") java.time.LocalDate dataInicio,
+                                               @Param("dataFim") java.time.LocalDate dataFim);
+
+    // === CONSULTAS PARA RELATÓRIOS ===
+
+    /**
+     * Busca membros recentes (últimos cadastrados)
+     */
+    @Query("SELECT m FROM Membro m WHERE m.ativo = true ORDER BY m.createdAt DESC")
+    List<Membro> findTop10ByOrderByCreatedAtDesc();
+
+    /**
+     * Conta total de membros por status
+     */
+    @Query("SELECT m.ativo, COUNT(m) FROM Membro m GROUP BY m.ativo")
+    List<Object[]> countMembrosPorStatus();
 }

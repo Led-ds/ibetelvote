@@ -2,22 +2,17 @@ package com.br.ibetelvote.domain.entities;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 @Entity
 @Table(name = "cargos", indexes = {
-        @Index(name = "idx_cargo_eleicao_id", columnList = "eleicao_id"),
         @Index(name = "idx_cargo_nome", columnList = "nome"),
-        @Index(name = "idx_cargo_ordem", columnList = "ordem_votacao")
+        @Index(name = "idx_cargo_ativo", columnList = "ativo")
 })
 @Getter
 @Setter
@@ -33,35 +28,15 @@ public class Cargo {
     private UUID id;
 
     @NotBlank(message = "Nome do cargo é obrigatório")
-    @Column(name = "nome", nullable = false, length = 100)
+    @Column(name = "nome", nullable = false, unique = true, length = 100)
     private String nome;
 
     @Column(name = "descricao", columnDefinition = "TEXT")
     private String descricao;
 
-    @NotNull(message = "Máximo de votos é obrigatório")
-    @Positive(message = "Máximo de votos deve ser positivo")
-    @Column(name = "max_votos", nullable = false)
-    private Integer maxVotos;
-
     @Builder.Default
-    @Column(name = "ordem_votacao")
-    private Integer ordemVotacao = 1;
-
-    @Builder.Default
-    @Column(name = "permite_voto_branco", nullable = false)
-    private Boolean permiteVotoBranco = true;
-
-    @Builder.Default
-    @Column(name = "obrigatorio", nullable = false)
-    private Boolean obrigatorio = true;
-
-    @Column(name = "instrucoes_especificas", columnDefinition = "TEXT")
-    private String instrucoesEspecificas;
-
-    @NotNull(message = "Eleição é obrigatória")
-    @Column(name = "eleicao_id", nullable = false)
-    private UUID eleicaoId;
+    @Column(name = "ativo", nullable = false)
+    private Boolean ativo = true;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -71,135 +46,103 @@ public class Cargo {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    // === RELACIONAMENTOS ===
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "eleicao_id", insertable = false, updatable = false)
-    private Eleicao eleicao;
-
-    @OneToMany(mappedBy = "cargo", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @Builder.Default
-    private List<Candidato> candidatos = new ArrayList<>();
-
-    @OneToMany(mappedBy = "cargo", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @Builder.Default
-    private List<Voto> votos = new ArrayList<>();
-
-    // === MÉTODOS DE NEGÓCIO ===
-
-    public void updateBasicInfo(String nome, String descricao, Integer maxVotos,
-                                Integer ordemVotacao, String instrucoesEspecificas) {
+    /**
+     * Atualiza as informações básicas do cargo
+     */
+    public void updateBasicInfo(String nome, String descricao) {
         this.nome = nome;
         this.descricao = descricao;
-        this.maxVotos = maxVotos;
-        this.ordemVotacao = ordemVotacao;
-        this.instrucoesEspecificas = instrucoesEspecificas;
     }
 
-    public void updateConfiguracoes(Boolean permiteVotoBranco, Boolean obrigatorio) {
-        this.permiteVotoBranco = permiteVotoBranco;
-        this.obrigatorio = obrigatorio;
+    /**
+     * Ativa o cargo
+     */
+    public void activate() {
+        this.ativo = true;
     }
 
-    public void associateEleicao(UUID eleicaoId) {
-        this.eleicaoId = eleicaoId;
+    /**
+     * Desativa o cargo
+     */
+    public void deactivate() {
+        this.ativo = false;
     }
 
-    // === MÉTODOS DE VALIDAÇÃO ===
-
-    public boolean temCandidatos() {
-        return candidatos != null && !candidatos.isEmpty();
+    /**
+     * Verifica se o cargo está ativo
+     */
+    public boolean isAtivo() {
+        return ativo != null && ativo;
     }
 
-    public boolean podeReceberVotos() {
-        return temCandidatos() && eleicao != null && eleicao.isVotacaoAberta();
+    /**
+     * Verifica se o cargo pode ser usado em eleições
+     */
+    public boolean podeSerUsadoEmEleicoes() {
+        return isAtivo() && nome != null && !nome.trim().isEmpty();
     }
 
-    public boolean isObrigatorio() {
-        return obrigatorio != null && obrigatorio;
+    /**
+     * Retorna o nome para exibição
+     */
+    public String getDisplayName() {
+        return nome;
     }
 
-    public boolean permiteVotoBranco() {
-        return permiteVotoBranco != null && permiteVotoBranco;
-    }
-
-    public boolean membroJaVotouNesteCargo(UUID membroId) {
-        return votos.stream()
-                .anyMatch(voto -> voto.getMembroId().equals(membroId));
-    }
-
-    public boolean membroAtingiuLimiteVotos(UUID membroId) {
-        long votosDoMembro = votos.stream()
-                .filter(voto -> voto.getMembroId().equals(membroId))
-                .count();
-        return votosDoMembro >= maxVotos;
-    }
-
-    // === MÉTODOS UTILITÁRIOS ===
-
-    public int getTotalVotos() {
-        return votos != null ? votos.size() : 0;
-    }
-
-    public int getTotalCandidatos() {
-        return candidatos != null ? candidatos.size() : 0;
-    }
-
-    public List<Candidato> getCandidatosAtivos() {
-        if (candidatos == null) {
-            return new ArrayList<>();
+    /**
+     * Retorna uma descrição resumida do cargo
+     */
+    public String getResumo() {
+        if (descricao != null && !descricao.trim().isEmpty()) {
+            return descricao.length() > 100 ?
+                    descricao.substring(0, 97) + "..." :
+                    descricao;
         }
-        return candidatos.stream()
-                .filter(candidato -> candidato.isAtivo())
-                .toList();
+        return "Sem descrição";
     }
 
-    public long getTotalVotosValidos() {
-        return votos.stream()
-                .filter(voto -> voto.getCandidatoId() != null)
-                .count();
+    /**
+     * Retorna o status do cargo
+     */
+    public String getStatus() {
+        return isAtivo() ? "Ativo" : "Inativo";
     }
 
-    public long getTotalVotosBranco() {
-        return votos.stream()
-                .filter(voto -> voto.isVotoBranco())
-                .count();
+    /**
+     * Valida se o nome do cargo é válido
+     */
+    public static boolean isNomeValido(String nome) {
+        return nome != null &&
+                !nome.trim().isEmpty() &&
+                nome.trim().length() >= 3 &&
+                nome.trim().length() <= 100;
     }
 
-    public long getTotalVotosNulo() {
-        return votos.stream()
-                .filter(voto -> voto.isVotoNulo())
-                .count();
-    }
-
-    public String getStatusVotacao() {
-        if (!podeReceberVotos()) {
-            return "Indisponível para votação";
+    /**
+     * Normaliza o nome do cargo (primeira letra maiúscula)
+     */
+    public static String normalizarNome(String nome) {
+        if (nome == null || nome.trim().isEmpty()) {
+            return nome;
         }
 
-        int totalVotos = getTotalVotos();
-        if (totalVotos == 0) {
-            return "Aguardando votos";
-        }
-
-        return String.format("%d votos recebidos", totalVotos);
+        String nomeNormalizado = nome.trim();
+        return nomeNormalizado.substring(0, 1).toUpperCase() +
+                nomeNormalizado.substring(1).toLowerCase();
     }
 
-    // === MÉTODOS DE RELATÓRIO ===
-
-    public double getPercentualParticipacao() {
-        if (eleicao == null || eleicao.getTotalVotantes() == 0) {
-            return 0.0;
-        }
-        return (getTotalVotos() * 100.0) / eleicao.getTotalVotantes();
+    /**
+     * Verifica se o cargo tem informações completas
+     */
+    public boolean temInformacoesCompletas() {
+        return isNomeValido(this.nome) &&
+                this.descricao != null &&
+                !this.descricao.trim().isEmpty();
     }
 
-    public String getResumoVotacao() {
-        int total = getTotalVotos();
-        long validos = getTotalVotosValidos();
-        long brancos = getTotalVotosBranco();
-        long nulos = getTotalVotosNulo();
-
-        return String.format("Total: %d | Válidos: %d | Brancos: %d | Nulos: %d",
-                total, validos, brancos, nulos);
+    @Override
+    public String toString() {
+        return String.format("Cargo{id=%s, nome='%s', ativo=%s}",
+                id, nome, ativo);
     }
 }

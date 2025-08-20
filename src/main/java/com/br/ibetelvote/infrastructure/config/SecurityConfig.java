@@ -209,6 +209,6 @@ public class SecurityConfig {
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(); // ✅ Força padrão (10) - CORRIGIDO
+        return new BCryptPasswordEncoder(); //Força padrão (10) - CORRIGIDO
     }
 }

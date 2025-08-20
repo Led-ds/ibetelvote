@@ -22,6 +22,10 @@ public class CreateMembroRequest {
     @Size(min = 2, max = 100, message = "Nome deve ter entre 2 e 100 caracteres")
     private String nome;
 
+    @NotBlank(message = "CPF é obrigatório")
+    @Size(min = 11, max = 14, message = "CPF deve ter formato válido")
+    private String cpf;
+
     @Email(message = "Email deve ser válido")
     @NotBlank(message = "Email é obrigatório")
     @Size(max = 150, message = "Email deve ter no máximo 150 caracteres")
@@ -30,17 +34,14 @@ public class CreateMembroRequest {
     @Past(message = "Data de nascimento deve ser no passado")
     private LocalDate dataNascimento;
 
-    // Dados específicos da igreja
-    @Size(max = 100, message = "Cargo deve ter no máximo 100 caracteres")
-    private String cargo;
+    // Cargo atual (opcional no cadastro)
+    private UUID cargoAtualId;
 
+    // Dados da igreja
     @Size(max = 100, message = "Departamento deve ter no máximo 100 caracteres")
     private String departamento;
 
-    @Past(message = "Data de batismo deve ser no passado")
     private LocalDate dataBatismo;
-
-    @Past(message = "Data de membro desde deve ser no passado")
     private LocalDate dataMembroDesde;
 
     // Dados de contato
@@ -62,9 +63,9 @@ public class CreateMembroRequest {
     @Size(max = 10, message = "CEP deve ter no máximo 10 caracteres")
     private String cep;
 
-    @Size(max = 1000, message = "Observações deve ter no máximo 1000 caracteres")
+    @Size(max = 1000, message = "Observações devem ter no máximo 1000 caracteres")
     private String observacoes;
 
-    // ID do usuário para associar (opcional)
-    private UUID userId;
+    @Builder.Default
+    private Boolean ativo = true;
 }

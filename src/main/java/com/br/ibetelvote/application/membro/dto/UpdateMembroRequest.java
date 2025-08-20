@@ -1,5 +1,6 @@
 package com.br.ibetelvote.application.membro.dto;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -8,6 +9,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Data
 @Builder
@@ -18,21 +20,27 @@ public class UpdateMembroRequest {
     @Size(min = 2, max = 100, message = "Nome deve ter entre 2 e 100 caracteres")
     private String nome;
 
+    @Size(min = 11, max = 14, message = "CPF deve ter formato válido")
+    private String cpf;
+
+    @Email(message = "Email deve ser válido")
+    @Size(max = 150, message = "Email deve ter no máximo 150 caracteres")
+    private String email;
+
     @Past(message = "Data de nascimento deve ser no passado")
     private LocalDate dataNascimento;
 
-    @Size(max = 100, message = "Cargo deve ter no máximo 100 caracteres")
-    private String cargo;
+    // Cargo atual
+    private UUID cargoAtualId;
 
+    // Dados da igreja
     @Size(max = 100, message = "Departamento deve ter no máximo 100 caracteres")
     private String departamento;
 
-    @Past(message = "Data de batismo deve ser no passado")
     private LocalDate dataBatismo;
-
-    @Past(message = "Data de membro desde deve ser no passado")
     private LocalDate dataMembroDesde;
 
+    // Dados de contato
     @Size(max = 20, message = "Telefone deve ter no máximo 20 caracteres")
     private String telefone;
 
@@ -51,6 +59,8 @@ public class UpdateMembroRequest {
     @Size(max = 10, message = "CEP deve ter no máximo 10 caracteres")
     private String cep;
 
-    @Size(max = 1000, message = "Observações deve ter no máximo 1000 caracteres")
+    @Size(max = 1000, message = "Observações devem ter no máximo 1000 caracteres")
     private String observacoes;
+
+    private Boolean ativo;
 }

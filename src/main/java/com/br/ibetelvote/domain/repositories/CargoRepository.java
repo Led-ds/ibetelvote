@@ -9,19 +9,32 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface CargoRepository {
+
+    // === OPERAÇÕES BÁSICAS ===
+    List<Cargo> findAll();
     Page<Cargo> findAll(Pageable pageable);
     void deleteById(UUID id);
-    boolean existsById(UUID id);
     long count();
 
-    // Consultas por eleição
-    List<Cargo> findByEleicaoId(UUID eleicaoId);
-    List<Cargo> findByEleicaoIdOrderByOrdemVotacao(UUID eleicaoId);
-    long countByEleicaoId(UUID eleicaoId);
+    // === CONSULTAS POR NOME ===
+    Optional<Cargo> findByNome(String nome);
+    boolean existsByNome(String nome);
+    List<Cargo> findByNomeContainingIgnoreCase(String nome);
 
-    // Consultas específicas
-    Optional<Cargo> findByNomeAndEleicaoId(String nome, UUID eleicaoId);
-    List<Cargo> findByObrigatorioTrue();
-    List<Cargo> findByPermiteVotoBrancoTrue();
-    boolean existsByNomeAndEleicaoId(String nome, UUID eleicaoId);
+    // === CONSULTAS POR STATUS ===
+    List<Cargo> findByAtivoTrue();
+    List<Cargo> findByAtivoFalse();
+    Page<Cargo> findByAtivo(Boolean ativo, Pageable pageable);
+    long countByAtivo(Boolean ativo);
+
+    // === CONSULTAS ORDENADAS ===
+    List<Cargo> findAllByOrderByNomeAsc();
+    List<Cargo> findByAtivoTrueOrderByNomeAsc();
+    Page<Cargo> findByAtivoTrueOrderByNomeAsc(Pageable pageable);
+
+    // === CONSULTAS PARA VALIDAÇÃO ===
+    boolean existsByNomeAndIdNot(String nome, UUID id);
+
+    // === CONSULTAS PARA RELATÓRIOS ===
+    List<Cargo> findTop10ByOrderByCreatedAtDesc();
 }
