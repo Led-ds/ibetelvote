@@ -1,6 +1,8 @@
 package com.br.ibetelvote.application.services;
 
-import com.br.ibetelvote.application.eleicao.dto.*;
+import com.br.ibetelvote.application.candidato.dto.CandidatoResponse;
+import com.br.ibetelvote.application.candidato.dto.CreateCandidatoRequest;
+import com.br.ibetelvote.application.candidato.dto.UpdateCandidatoRequest;
 import com.br.ibetelvote.application.mapper.CandidatoMapper;
 import com.br.ibetelvote.application.shared.dto.UploadPhotoResponse;
 import com.br.ibetelvote.domain.entities.Candidato;
@@ -8,7 +10,6 @@ import com.br.ibetelvote.domain.entities.Cargo;
 import com.br.ibetelvote.domain.entities.Eleicao;
 import com.br.ibetelvote.domain.entities.Membro;
 import com.br.ibetelvote.domain.services.CandidatoService;
-import com.br.ibetelvote.domain.services.FileStorageService;
 import com.br.ibetelvote.infrastructure.repositories.CandidatoJpaRepository;
 import com.br.ibetelvote.infrastructure.repositories.CargoJpaRepository;
 import com.br.ibetelvote.infrastructure.repositories.EleicaoJpaRepository;

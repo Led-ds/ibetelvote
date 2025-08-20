@@ -1,6 +1,9 @@
 package com.br.ibetelvote.application.mapper;
 
-import com.br.ibetelvote.application.eleicao.dto.*;
+import com.br.ibetelvote.application.candidato.dto.CandidatoBasicInfo;
+import com.br.ibetelvote.application.candidato.dto.CandidatoResponse;
+import com.br.ibetelvote.application.candidato.dto.CreateCandidatoRequest;
+import com.br.ibetelvote.application.candidato.dto.UpdateCandidatoRequest;
 import com.br.ibetelvote.domain.entities.Candidato;
 import org.mapstruct.*;
 

@@ -1,6 +1,9 @@
 package com.br.ibetelvote.domain.services;
 
-import com.br.ibetelvote.application.eleicao.dto.*;
+import com.br.ibetelvote.application.cargo.dto.CargoBasicInfo;
+import com.br.ibetelvote.application.cargo.dto.CargoResponse;
+import com.br.ibetelvote.application.cargo.dto.CreateCargoRequest;
+import com.br.ibetelvote.application.cargo.dto.UpdateCargoRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 

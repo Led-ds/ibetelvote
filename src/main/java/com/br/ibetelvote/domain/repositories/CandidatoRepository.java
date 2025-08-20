@@ -9,34 +9,100 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface CandidatoRepository {
-    Page<Candidato> findAll(Pageable pageable);
+
+    // === OPERAÇÕES BÁSICAS ===
     void deleteById(UUID id);
-    boolean existsById(UUID id);
     long count();
 
-    // Consultas por eleição e cargo
+    // === CONSULTAS POR ELEIÇÃO ===
     List<Candidato> findByEleicaoId(UUID eleicaoId);
-    List<Candidato> findByCargoId(UUID cargoId);
-    List<Candidato> findByEleicaoIdAndCargoId(UUID eleicaoId, UUID cargoId);
+    Page<Candidato> findByEleicaoId(UUID eleicaoId, Pageable pageable);
+    long countByEleicaoId(UUID eleicaoId);
+    List<Candidato> findByEleicaoIdOrderByNomeCandidatoAsc(UUID eleicaoId);
 
-    // Consultas por membro
+    // === CONSULTAS POR CARGO PRETENDIDO ===
+    List<Candidato> findByCargoPretendidoId(UUID cargoId);
+    Page<Candidato> findByCargoPretendidoId(UUID cargoId, Pageable pageable);
+    long countByCargoPretendidoId(UUID cargoId);
+    List<Candidato> findByCargoPretendidoIdOrderByNomeCandidatoAsc(UUID cargoId);
+
+    // === CONSULTAS POR MEMBRO ===
     List<Candidato> findByMembroId(UUID membroId);
-    Optional<Candidato> findByMembroIdAndCargoId(UUID membroId, UUID cargoId);
-    boolean existsByMembroIdAndCargoId(UUID membroId, UUID cargoId);
+    Page<Candidato> findByMembroId(UUID membroId, Pageable pageable);
+    long countByMembroId(UUID membroId);
+    Optional<Candidato> findByMembroIdAndEleicaoId(UUID membroId, UUID eleicaoId);
 
-    // Consultas por status
+    // === CONSULTAS POR STATUS ===
     List<Candidato> findByAtivoTrue();
+    List<Candidato> findByAtivoFalse();
+    Page<Candidato> findByAtivo(Boolean ativo, Pageable pageable);
+    long countByAtivo(Boolean ativo);
+
     List<Candidato> findByAprovadoTrue();
     List<Candidato> findByAprovadoFalse();
-    List<Candidato> findByAtivoTrueAndAprovadoTrue();
+    Page<Candidato> findByAprovado(Boolean aprovado, Pageable pageable);
+    long countByAprovado(Boolean aprovado);
 
-    // Consultas específicas
-    Optional<Candidato> findByNumeroCandidatoAndEleicaoId(String numero, UUID eleicaoId);
-    boolean existsByNumeroCandidatoAndEleicaoId(String numero, UUID eleicaoId);
-    List<Candidato> findCandidatosAprovadosByCargoId(UUID cargoId);
+    // === CONSULTAS COMBINADAS ===
+    List<Candidato> findByEleicaoIdAndCargoPretendidoId(UUID eleicaoId, UUID cargoId);
+    List<Candidato> findByEleicaoIdAndAtivoTrue(UUID eleicaoId);
+    List<Candidato> findByEleicaoIdAndAprovadoTrue(UUID eleicaoId);
+    List<Candidato> findByEleicaoIdAndAtivoTrueAndAprovadoTrue(UUID eleicaoId);
 
-    // Estatísticas
-    long countByEleicaoId(UUID eleicaoId);
-    long countByCargoId(UUID cargoId);
-    long countByAprovadoTrue();
+    // === CONSULTAS POR NÚMERO ===
+    Optional<Candidato> findByNumeroCandidato(String numeroCandidato);
+    Optional<Candidato> findByNumeroCandidatoAndEleicaoId(String numeroCandidato, UUID eleicaoId);
+    boolean existsByNumeroCandidatoAndEleicaoId(String numeroCandidato, UUID eleicaoId);
+
+    // === CONSULTAS PARA VALIDAÇÃO ===
+    boolean existsByMembroIdAndEleicaoId(UUID membroId, UUID eleicaoId);
+    boolean existsByMembroIdAndCargoPretendidoIdAndEleicaoId(UUID membroId, UUID cargoId, UUID eleicaoId);
+    boolean existsByNumeroCandidatoAndEleicaoIdAndIdNot(String numeroCandidato, UUID eleicaoId, UUID candidatoId);
+
+    // === CONSULTAS CUSTOMIZADAS ===
+
+    /**
+     * Busca candidatos elegíveis (ativos, aprovados e aptos para votação)
+     */
+    List<Candidato> findCandidatosElegiveis(UUID eleicaoId);
+
+    /**
+     * Busca candidatos por cargo em eleição específica ordenados por votos
+     */
+    List<Candidato> findByCargoPretendidoIdAndEleicaoIdOrderByVotosDesc(UUID cargoId, UUID eleicaoId);
+
+    /**
+     * Busca candidatos com candidatura completa
+     */
+    List<Candidato> findCandidatosComCandidaturaCompleta(UUID eleicaoId);
+
+    /**
+     * Busca candidatos pendentes de aprovação
+     */
+    List<Candidato> findCandidatosPendentesAprovacao(UUID eleicaoId);
+
+    /**
+     * Busca candidatos por nome (busca parcial)
+     */
+    List<Candidato> findByNomeCandidatoContainingIgnoreCase(String nome);
+
+    /**
+     * Busca candidatos com mais votos por cargo
+     */
+    List<Candidato> findTopCandidatosPorCargo(UUID cargoId, UUID eleicaoId, int limite);
+
+    /**
+     * Conta candidatos ativos por eleição e cargo
+     */
+    long countCandidatosAtivosPorCargoEEleicao(UUID cargoId, UUID eleicaoId);
+
+    /**
+     * Busca candidatos sem número definido
+     */
+    List<Candidato> findCandidatosSemNumero(UUID eleicaoId);
+
+    /**
+     * Busca últimos candidatos cadastrados
+     */
+    List<Candidato> findUltimosCandidatosCadastrados(int limite);
 }

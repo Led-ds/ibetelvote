@@ -1,4 +1,4 @@
-package com.br.ibetelvote.application.eleicao.dto;
+package com.br.ibetelvote.application.membro.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,10 +11,13 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CargoBasicInfo {
+public class MembroBasicInfo {
 
     private UUID id;
     private String nome;
+    private String email;
+    private UUID cargoAtualId;
+    private String nomeCargoAtual;
     private Boolean ativo;
-    private String status;
+    private boolean hasUser;
 }

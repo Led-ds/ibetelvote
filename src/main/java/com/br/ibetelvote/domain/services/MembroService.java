@@ -1,6 +1,6 @@
 package com.br.ibetelvote.domain.services;
 
-import com.br.ibetelvote.application.eleicao.dto.MembroBasicInfo;
+import com.br.ibetelvote.application.membro.dto.MembroBasicInfo;
 import com.br.ibetelvote.application.membro.dto.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
