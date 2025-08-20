@@ -1,4 +1,4 @@
-package com.br.ibetelvote.application.eleicao.dto;
+package com.br.ibetelvote.application.voto.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -12,21 +12,22 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class VotoResponse {
+public class VotoAuditResponse {
 
     private UUID id;
-    private UUID membroId;
     private UUID eleicaoId;
-    private UUID cargoId;
-    private UUID candidatoId;
+    private UUID cargoPretendidoId;
     private Boolean votoBranco;
     private Boolean votoNulo;
-    private String hashVoto;
     private LocalDateTime dataVoto;
 
-    // Dados relacionados (sem quebrar sigilo)
+    // === DADOS SEGUROS PARA AUDITORIA ===
     private String nomeEleicao;
-    private String nomeCargo;
+    private String nomeCargoPretendido;
     private String tipoVoto;
     private String dataVotoFormatada;
+    private boolean votoValido;
+
+    // === SEM DADOS SENSÍVEIS ===
+    // Não inclui: membroId, candidatoId, hashVoto, IP
 }

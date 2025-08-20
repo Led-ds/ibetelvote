@@ -14,6 +14,7 @@ public interface CandidatoRepository {
     void deleteById(UUID id);
     long count();
 
+
     // === CONSULTAS POR ELEIÇÃO ===
     List<Candidato> findByEleicaoId(UUID eleicaoId);
     Page<Candidato> findByEleicaoId(UUID eleicaoId, Pageable pageable);
@@ -49,6 +50,16 @@ public interface CandidatoRepository {
     List<Candidato> findByEleicaoIdAndAprovadoTrue(UUID eleicaoId);
     List<Candidato> findByEleicaoIdAndAtivoTrueAndAprovadoTrue(UUID eleicaoId);
 
+    // === MÉTODOS FALTANTES ADICIONADOS ===
+    List<Candidato> findByCargoPretendidoIdAndEleicaoIdAndAtivoTrueAndAprovadoTrue(UUID cargoId, UUID eleicaoId);
+    List<Candidato> findByCargoPretendidoIdAndAtivoTrueAndAprovadoTrue(UUID cargoId);
+    long countByEleicaoIdAndAtivoTrue(UUID eleicaoId);
+    long countByEleicaoIdAndAprovadoTrue(UUID eleicaoId);
+    long countByEleicaoIdAndAprovadoFalse(UUID eleicaoId);
+    long countByEleicaoIdAndAtivoFalse(UUID eleicaoId);
+    List<Candidato> findByEleicaoIdAndAprovadoFalse(UUID eleicaoId);
+    List<Candidato> findByEleicaoIdAndAtivoFalse(UUID eleicaoId);
+
     // === CONSULTAS POR NÚMERO ===
     Optional<Candidato> findByNumeroCandidato(String numeroCandidato);
     Optional<Candidato> findByNumeroCandidatoAndEleicaoId(String numeroCandidato, UUID eleicaoId);
@@ -60,49 +71,21 @@ public interface CandidatoRepository {
     boolean existsByNumeroCandidatoAndEleicaoIdAndIdNot(String numeroCandidato, UUID eleicaoId, UUID candidatoId);
 
     // === CONSULTAS CUSTOMIZADAS ===
-
-    /**
-     * Busca candidatos elegíveis (ativos, aprovados e aptos para votação)
-     */
     List<Candidato> findCandidatosElegiveis(UUID eleicaoId);
-
-    /**
-     * Busca candidatos por cargo em eleição específica ordenados por votos
-     */
     List<Candidato> findByCargoPretendidoIdAndEleicaoIdOrderByVotosDesc(UUID cargoId, UUID eleicaoId);
-
-    /**
-     * Busca candidatos com candidatura completa
-     */
     List<Candidato> findCandidatosComCandidaturaCompleta(UUID eleicaoId);
-
-    /**
-     * Busca candidatos pendentes de aprovação
-     */
     List<Candidato> findCandidatosPendentesAprovacao(UUID eleicaoId);
-
-    /**
-     * Busca candidatos por nome (busca parcial)
-     */
     List<Candidato> findByNomeCandidatoContainingIgnoreCase(String nome);
-
-    /**
-     * Busca candidatos com mais votos por cargo
-     */
     List<Candidato> findTopCandidatosPorCargo(UUID cargoId, UUID eleicaoId, int limite);
-
-    /**
-     * Conta candidatos ativos por eleição e cargo
-     */
     long countCandidatosAtivosPorCargoEEleicao(UUID cargoId, UUID eleicaoId);
-
-    /**
-     * Busca candidatos sem número definido
-     */
     List<Candidato> findCandidatosSemNumero(UUID eleicaoId);
-
-    /**
-     * Busca últimos candidatos cadastrados
-     */
     List<Candidato> findUltimosCandidatosCadastrados(int limite);
+    List<Object[]> countCandidatosPorStatusNaEleicao(UUID eleicaoId);
+    List<Object[]> countCandidatosPorCargoNaEleicao(UUID eleicaoId);
+    List<Candidato> findRankingCandidatosPorCargo(UUID cargoId, UUID eleicaoId);
+    List<Candidato> findCandidatosComFoto(UUID eleicaoId);
+    List<Candidato> findCandidatosSemFoto(UUID eleicaoId);
+    boolean membroJaEhCandidatoEmEleicaoAtiva(UUID membroId);
+    long countCandidaturasMembroPorEleicao(UUID membroId, UUID eleicaoId);
+    List<Candidato> findTodosCandidatosElegiveisParaVotacao();
 }

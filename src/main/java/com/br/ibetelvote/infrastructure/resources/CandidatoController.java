@@ -1,8 +1,6 @@
 package com.br.ibetelvote.infrastructure.resources;
 
-import com.br.ibetelvote.application.candidato.dto.CandidatoResponse;
-import com.br.ibetelvote.application.candidato.dto.CreateCandidatoRequest;
-import com.br.ibetelvote.application.candidato.dto.UpdateCandidatoRequest;
+import com.br.ibetelvote.application.candidato.dto.*;
 import com.br.ibetelvote.application.shared.dto.UploadPhotoResponse;
 import com.br.ibetelvote.domain.services.CandidatoService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,6 +13,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -65,6 +66,19 @@ public class CandidatoController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/{id}/with-photo")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO', 'MEMBRO')")
+    @Operation(summary = "Buscar candidato com foto", description = "Retorna os dados de um candidato com foto em Base64")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Candidato encontrado"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "404", description = "Candidato não encontrado")
+    })
+    public ResponseEntity<CandidatoResponse> getCandidatoByIdWithPhoto(@PathVariable UUID id) {
+        CandidatoResponse response = candidatoService.getCandidatoByIdWithPhoto(id);
+        return ResponseEntity.ok(response);
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     @Operation(summary = "Atualizar candidato", description = "Atualiza os dados de um candidato")
@@ -112,6 +126,44 @@ public class CandidatoController {
         return ResponseEntity.ok(candidatos);
     }
 
+    @GetMapping("/eleicao/{eleicaoId}/listagem")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO', 'MEMBRO')")
+    @Operation(summary = "Candidatos para listagem", description = "Lista candidatos otimizada para tabelas")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado")
+    })
+    public ResponseEntity<List<CandidatoListResponse>> getCandidatosParaListagem(@PathVariable UUID eleicaoId) {
+        List<CandidatoListResponse> candidatos = candidatoService.getCandidatosParaListagem(eleicaoId);
+        return ResponseEntity.ok(candidatos);
+    }
+
+    @GetMapping("/eleicao/{eleicaoId}/listagem/paginada")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO', 'MEMBRO')")
+    @Operation(summary = "Candidatos paginados", description = "Lista candidatos com paginação")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Página retornada com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado")
+    })
+    public ResponseEntity<Page<CandidatoListResponse>> getCandidatosParaListagem(
+            @PathVariable UUID eleicaoId,
+            @PageableDefault(size = 20) Pageable pageable) {
+        Page<CandidatoListResponse> candidatos = candidatoService.getCandidatosParaListagem(eleicaoId, pageable);
+        return ResponseEntity.ok(candidatos);
+    }
+
+    @GetMapping("/eleicao/{eleicaoId}/elegiveis")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO', 'MEMBRO')")
+    @Operation(summary = "Candidatos elegíveis", description = "Lista candidatos elegíveis para votação")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado")
+    })
+    public ResponseEntity<List<CandidatoResponse>> getCandidatosElegiveis(@PathVariable UUID eleicaoId) {
+        List<CandidatoResponse> candidatos = candidatoService.getCandidatosElegiveis(eleicaoId);
+        return ResponseEntity.ok(candidatos);
+    }
+
     @GetMapping("/cargo/{cargoId}")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO', 'MEMBRO')")
     @Operation(summary = "Candidatos por cargo", description = "Lista todos os candidatos de um cargo específico")
@@ -120,9 +172,23 @@ public class CandidatoController {
             @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
             @ApiResponse(responseCode = "404", description = "Cargo não encontrado")
     })
-    public ResponseEntity<List<CandidatoResponse>> getCandidatosByCargoId(@PathVariable UUID cargoId) {
-        List<CandidatoResponse> candidatos = candidatoService.getCandidatosByCargoId(cargoId);
+    public ResponseEntity<List<CandidatoResponse>> getCandidatosByCargoPretendidoId(@PathVariable UUID cargoId) {
+        List<CandidatoResponse> candidatos = candidatoService.getCandidatosByCargoPretendidoId(cargoId);
         return ResponseEntity.ok(candidatos);
+    }
+
+    @GetMapping("/cargo/{cargoId}/eleicao/{eleicaoId}/ranking")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO', 'MEMBRO')")
+    @Operation(summary = "Ranking por cargo", description = "Ranking de candidatos por número de votos")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Ranking retornado com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado")
+    })
+    public ResponseEntity<List<CandidatoRankingResponse>> getRankingCandidatosPorCargo(
+            @PathVariable UUID cargoId,
+            @PathVariable UUID eleicaoId) {
+        List<CandidatoRankingResponse> ranking = candidatoService.getRankingCandidatosPorCargo(cargoId, eleicaoId);
+        return ResponseEntity.ok(ranking);
     }
 
     @GetMapping("/cargo/{cargoId}/aprovados")
@@ -167,8 +233,22 @@ public class CandidatoController {
     })
     public ResponseEntity<Void> reprovarCandidato(
             @PathVariable UUID id,
-            @RequestBody ReprovarCandidatoRequest request) {
+            @RequestBody @Valid AprovarCandidatoRequest request) {
         candidatoService.reprovarCandidato(id, request.getMotivo());
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/aprovar-lote")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @Operation(summary = "Aprovar candidatos em lote", description = "Aprova múltiplos candidatos de uma vez")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Operação concluída"),
+            @ApiResponse(responseCode = "400", description = "Lista de IDs inválida"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<Void> aprovarCandidatos(@RequestBody @Valid AprovarCandidatosLoteRequest request) {
+        candidatoService.aprovarCandidatos(request.getCandidatoIds());
         return ResponseEntity.ok().build();
     }
 
@@ -202,7 +282,7 @@ public class CandidatoController {
         return ResponseEntity.ok().build();
     }
 
-    @PostMapping("/{id}/numero")
+    @PutMapping("/{id}/numero")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     @Operation(summary = "Definir número do candidato", description = "Define o número de campanha do candidato")
     @ApiResponses({
@@ -214,14 +294,31 @@ public class CandidatoController {
     })
     public ResponseEntity<Void> definirNumeroCandidato(
             @PathVariable UUID id,
-            @RequestBody DefinirNumeroRequest request) {
+            @RequestBody @Valid UpdateNumeroCandidatoRequest request) {
         candidatoService.definirNumeroCandidato(id, request.getNumero());
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/{id}/cargo-pretendido")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @Operation(summary = "Atualizar cargo pretendido", description = "Altera o cargo pretendido do candidato")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Cargo pretendido atualizado com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Cargo inválido ou membro não elegível"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado"),
+            @ApiResponse(responseCode = "404", description = "Candidato não encontrado")
+    })
+    public ResponseEntity<Void> updateCargoPretendido(
+            @PathVariable UUID id,
+            @RequestBody @Valid UpdateCargoPretendidoRequest request) {
+        candidatoService.updateCargoPretendido(id, request.getCargoPretendidoId());
         return ResponseEntity.ok().build();
     }
 
     // === OPERAÇÕES DE FOTO ===
 
-    @PostMapping(value = "/{id}/foto", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/{id}/foto-campanha", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     @Operation(summary = "Upload de foto de campanha", description = "Faz upload da foto de campanha do candidato")
     @ApiResponses({
@@ -239,7 +336,7 @@ public class CandidatoController {
         return ResponseEntity.ok(response);
     }
 
-    @DeleteMapping("/{id}/foto")
+    @DeleteMapping("/{id}/foto-campanha")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     @Operation(summary = "Remover foto de campanha", description = "Remove a foto de campanha do candidato")
     @ApiResponses({
@@ -251,6 +348,19 @@ public class CandidatoController {
     public ResponseEntity<Void> removeFotoCampanha(@PathVariable UUID id) {
         candidatoService.removeFotoCampanha(id);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/{id}/foto-campanha")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO', 'MEMBRO')")
+    @Operation(summary = "Obter foto de campanha", description = "Retorna a foto de campanha em Base64")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Foto retornada com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "404", description = "Candidato ou foto não encontrada")
+    })
+    public ResponseEntity<String> getFotoCampanhaBase64(@PathVariable UUID id) {
+        String fotoBase64 = candidatoService.getFotoCampanhaBase64(id);
+        return ResponseEntity.ok(fotoBase64);
     }
 
     // === CONSULTAS ESPECÍFICAS ===
@@ -297,6 +407,47 @@ public class CandidatoController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/search")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO', 'MEMBRO')")
+    @Operation(summary = "Buscar candidatos por nome", description = "Busca candidatos pelo nome")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado")
+    })
+    public ResponseEntity<List<CandidatoResponse>> buscarCandidatosPorNome(
+            @Parameter(description = "Nome do candidato") @RequestParam String nome) {
+        List<CandidatoResponse> candidatos = candidatoService.buscarCandidatosPorNome(nome);
+        return ResponseEntity.ok(candidatos);
+    }
+
+    @GetMapping("/eleicao/{eleicaoId}/sem-numero")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @Operation(summary = "Candidatos sem número", description = "Lista candidatos que não têm número definido")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<List<CandidatoResponse>> getCandidatosSemNumero(@PathVariable UUID eleicaoId) {
+        List<CandidatoResponse> candidatos = candidatoService.getCandidatosSemNumero(eleicaoId);
+        return ResponseEntity.ok(candidatos);
+    }
+
+    @PostMapping("/filtros")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
+    @Operation(summary = "Buscar com filtros", description = "Busca candidatos com filtros customizados")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Página retornada com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<Page<CandidatoResponse>> buscarCandidatosComFiltros(
+            @RequestBody @Valid CandidatoFilterRequest filtros,
+            @PageableDefault(size = 20) Pageable pageable) {
+        Page<CandidatoResponse> candidatos = candidatoService.buscarCandidatosComFiltros(filtros, pageable);
+        return ResponseEntity.ok(candidatos);
+    }
+
     // === VALIDAÇÕES ===
 
     @GetMapping("/exists/membro-cargo")
@@ -309,8 +460,9 @@ public class CandidatoController {
     })
     public ResponseEntity<Boolean> existsCandidatoByMembroAndCargo(
             @Parameter(description = "ID do membro") @RequestParam UUID membroId,
-            @Parameter(description = "ID do cargo") @RequestParam UUID cargoId) {
-        boolean exists = candidatoService.existsCandidatoByMembroAndCargo(membroId, cargoId);
+            @Parameter(description = "ID do cargo") @RequestParam UUID cargoId,
+            @Parameter(description = "ID da eleição") @RequestParam UUID eleicaoId) {
+        boolean exists = candidatoService.existsCandidatoByMembroAndCargo(membroId, cargoId, eleicaoId);
         return ResponseEntity.ok(exists);
     }
 
@@ -341,6 +493,20 @@ public class CandidatoController {
     public ResponseEntity<Boolean> canDeleteCandidato(@PathVariable UUID id) {
         boolean canDelete = candidatoService.canDeleteCandidato(id);
         return ResponseEntity.ok(canDelete);
+    }
+
+    @GetMapping("/{id}/elegibilidade")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
+    @Operation(summary = "Verificar elegibilidade", description = "Verifica se candidato está elegível")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Verificação realizada"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado"),
+            @ApiResponse(responseCode = "404", description = "Candidato não encontrado")
+    })
+    public ResponseEntity<CandidatoElegibilidadeResponse> verificarElegibilidade(@PathVariable UUID id) {
+        CandidatoElegibilidadeResponse response = candidatoService.verificarElegibilidade(id);
+        return ResponseEntity.ok(response);
     }
 
     // === ESTATÍSTICAS ===
@@ -384,13 +550,39 @@ public class CandidatoController {
         return ResponseEntity.ok(total);
     }
 
-    // === DTOs INTERNOS ===
+    @GetMapping("/stats/total/ativos")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
+    @Operation(summary = "Total de ativos", description = "Retorna o total de candidatos ativos")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Total retornado com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<Long> getTotalCandidatosAtivos() {
+        long total = candidatoService.getTotalCandidatosAtivos();
+        return ResponseEntity.ok(total);
+    }
+
+    @GetMapping("/stats/completas/{eleicaoId}")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
+    @Operation(summary = "Estatísticas completas", description = "Retorna estatísticas completas de uma eleição")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Estatísticas retornadas com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<CandidatoStatsResponse> getEstatisticasCandidatos(@PathVariable UUID eleicaoId) {
+        CandidatoStatsResponse stats = candidatoService.getEstatisticasCandidatos(eleicaoId);
+        return ResponseEntity.ok(stats);
+    }
+
+    // === DTOs INTERNOS PARA REQUESTS ===
 
     @lombok.Data
     @lombok.Builder
     @lombok.NoArgsConstructor
     @lombok.AllArgsConstructor
-    private static class ReprovarCandidatoRequest {
+    public static class AprovarCandidatoRequest {
         @jakarta.validation.constraints.NotBlank(message = "Motivo é obrigatório")
         private String motivo;
     }
@@ -399,15 +591,36 @@ public class CandidatoController {
     @lombok.Builder
     @lombok.NoArgsConstructor
     @lombok.AllArgsConstructor
-    private static class DefinirNumeroRequest {
+    public static class AprovarCandidatosLoteRequest {
+        @jakarta.validation.constraints.NotEmpty(message = "Lista de candidatos não pode estar vazia")
+        private List<UUID> candidatoIds;
+    }
+
+    @lombok.Data
+    @lombok.Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
+    public static class UpdateNumeroCandidatoRequest {
         @jakarta.validation.constraints.NotBlank(message = "Número é obrigatório")
+        @jakarta.validation.constraints.Size(max = 10, message = "Número deve ter no máximo 10 caracteres")
         private String numero;
+    }
+
+    @lombok.Data
+    @lombok.Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
+    public static class UpdateCargoPretendidoRequest {
+        @jakarta.validation.constraints.NotNull(message = "ID do cargo pretendido é obrigatório")
+        private UUID cargoPretendidoId;
     }
 
     // === EXCEPTION HANDLERS ===
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException e, HttpServletRequest request) {
+        log.error("Erro de argumento inválido: {}", e.getMessage());
+
         ErrorResponse error = ErrorResponse.builder()
                 .code("INVALID_REQUEST")
                 .message(e.getMessage())
@@ -419,6 +632,8 @@ public class CandidatoController {
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ErrorResponse> handleIllegalState(IllegalStateException e, HttpServletRequest request) {
+        log.error("Erro de estado inválido: {}", e.getMessage());
+
         ErrorResponse error = ErrorResponse.builder()
                 .code("INVALID_STATE")
                 .message(e.getMessage())
@@ -430,6 +645,8 @@ public class CandidatoController {
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ErrorResponse> handleRuntimeException(RuntimeException e, HttpServletRequest request) {
+        log.error("Erro interno: {}", e.getMessage(), e);
+
         ErrorResponse error = ErrorResponse.builder()
                 .code("INTERNAL_ERROR")
                 .message("Erro interno do servidor")

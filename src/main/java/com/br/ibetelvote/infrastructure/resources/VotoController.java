@@ -1,6 +1,9 @@
 package com.br.ibetelvote.infrastructure.resources;
 
-import com.br.ibetelvote.application.eleicao.dto.*;
+import com.br.ibetelvote.application.voto.dto.ValidarVotacaoResponse;
+import com.br.ibetelvote.application.voto.dto.VotarRequest;
+import com.br.ibetelvote.application.voto.dto.VotoFilterRequest;
+import com.br.ibetelvote.application.voto.dto.VotoResponse;
 import com.br.ibetelvote.domain.services.VotoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -11,6 +14,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -48,7 +54,7 @@ public class VotoController {
             Authentication authentication,
             HttpServletRequest httpRequest) {
 
-        UUID membroId = UUID.fromString(authentication.getName()); // Assumindo que o ID está no token
+        UUID membroId = extractMembroId(authentication);
         String ipOrigem = getClientIpAddress(httpRequest);
         String userAgent = httpRequest.getHeader("User-Agent");
 
@@ -59,7 +65,7 @@ public class VotoController {
     // === CONSULTAS POR MEMBRO ===
 
     @GetMapping("/membro/{membroId}")
-    @PreAuthorize("hasRole('ADMINISTRADOR') or #membroId == authentication.name")
+    @PreAuthorize("hasRole('ADMINISTRADOR') or #membroId.toString() == authentication.name")
     @Operation(summary = "Votos por membro", description = "Lista todos os votos de um membro específico")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lista de votos retornada com sucesso"),
@@ -73,7 +79,7 @@ public class VotoController {
     }
 
     @GetMapping("/membro/{membroId}/eleicao/{eleicaoId}/ja-votou")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO') or #membroId == authentication.name")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO') or #membroId.toString() == authentication.name")
     @Operation(summary = "Verificar se já votou", description = "Verifica se um membro já votou em uma eleição")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Verificação realizada com sucesso"),
@@ -87,8 +93,8 @@ public class VotoController {
         return ResponseEntity.ok(jaVotou);
     }
 
-    @GetMapping("/membro/{membroId}/cargo/{cargoId}/eleicao/{eleicaoId}/ja-votou")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO') or #membroId == authentication.name")
+    @GetMapping("/membro/{membroId}/cargo-pretendido/{cargoPretendidoId}/eleicao/{eleicaoId}/ja-votou")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO') or #membroId.toString() == authentication.name")
     @Operation(summary = "Verificar voto no cargo", description = "Verifica se um membro já votou em um cargo específico")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Verificação realizada com sucesso"),
@@ -97,9 +103,9 @@ public class VotoController {
     })
     public ResponseEntity<Boolean> membroJaVotouNoCargo(
             @PathVariable UUID membroId,
-            @PathVariable UUID cargoId,
+            @PathVariable UUID cargoPretendidoId, // ✅ CORRIGIDO: Era cargoId
             @PathVariable UUID eleicaoId) {
-        boolean jaVotou = votoService.membroJaVotouNoCargo(membroId, cargoId, eleicaoId);
+        boolean jaVotou = votoService.membroJaVotouNoCargo(membroId, cargoPretendidoId, eleicaoId);
         return ResponseEntity.ok(jaVotou);
     }
 
@@ -119,6 +125,22 @@ public class VotoController {
         return ResponseEntity.ok(votos);
     }
 
+    @GetMapping("/eleicao/{eleicaoId}/paginados")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
+    @Operation(summary = "Votos paginados por eleição", description = "Lista votos de uma eleição com paginação")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Página de votos retornada com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<Page<VotoResponse>> getVotosByEleicaoPaginados(
+            @PathVariable UUID eleicaoId,
+            @PageableDefault(size = 50) Pageable pageable) {
+        // TODO: Implementar método paginado no service
+        List<VotoResponse> votos = votoService.getVotosByEleicaoId(eleicaoId);
+        return ResponseEntity.ok(Page.empty()); // Implementação temporária
+    }
+
     @GetMapping("/eleicao/{eleicaoId}/total")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
     @Operation(summary = "Total de votos da eleição", description = "Retorna o total de votos de uma eleição")
@@ -132,31 +154,57 @@ public class VotoController {
         return ResponseEntity.ok(total);
     }
 
-    // === CONSULTAS POR CARGO ===
+    // === CONSULTAS POR CARGO PRETENDIDO ===
 
-    @GetMapping("/cargo/{cargoId}")
+    @GetMapping("/cargo-pretendido/{cargoPretendidoId}")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
-    @Operation(summary = "Votos por cargo", description = "Lista todos os votos de um cargo")
+    @Operation(summary = "Votos por cargo pretendido", description = "Lista todos os votos de um cargo pretendido")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lista de votos retornada com sucesso"),
             @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
             @ApiResponse(responseCode = "403", description = "Acesso negado"),
             @ApiResponse(responseCode = "404", description = "Cargo não encontrado")
     })
+    public ResponseEntity<List<VotoResponse>> getVotosByCargoPretendido(@PathVariable UUID cargoPretendidoId) {
+        List<VotoResponse> votos = votoService.getVotosByCargoPretendidoId(cargoPretendidoId);
+        return ResponseEntity.ok(votos);
+    }
+
+    @GetMapping("/cargo-pretendido/{cargoPretendidoId}/total")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
+    @Operation(summary = "Total de votos do cargo", description = "Retorna o total de votos de um cargo pretendido")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Total retornado com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<Long> getTotalVotosByCargoPretendido(@PathVariable UUID cargoPretendidoId) {
+        long total = votoService.getTotalVotosByCargoPretendido(cargoPretendidoId);
+        return ResponseEntity.ok(total);
+    }
+
+    // === ENDPOINTS DE COMPATIBILIDADE (DEPRECATED) ===
+
+    @GetMapping("/cargo/{cargoId}")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
+    @Operation(summary = "Votos por cargo (DEPRECATED)", description = "Use /cargo-pretendido/{id} instead")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista de votos retornada com sucesso"),
+            @ApiResponse(responseCode = "410", description = "Endpoint deprecated - use /cargo-pretendido/{id}")
+    })
+    @Deprecated
     public ResponseEntity<List<VotoResponse>> getVotosByCargo(@PathVariable UUID cargoId) {
+        log.warn("Endpoint deprecated usado: /cargo/{} - Use /cargo-pretendido/{} instead", cargoId, cargoId);
         List<VotoResponse> votos = votoService.getVotosByCargoId(cargoId);
         return ResponseEntity.ok(votos);
     }
 
     @GetMapping("/cargo/{cargoId}/total")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
-    @Operation(summary = "Total de votos do cargo", description = "Retorna o total de votos de um cargo")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Total retornado com sucesso"),
-            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
-            @ApiResponse(responseCode = "403", description = "Acesso negado")
-    })
+    @Operation(summary = "Total por cargo (DEPRECATED)", description = "Use /cargo-pretendido/{id}/total instead")
+    @Deprecated
     public ResponseEntity<Long> getTotalVotosByCargo(@PathVariable UUID cargoId) {
+        log.warn("Endpoint deprecated usado: /cargo/{}/total - Use /cargo-pretendido/{}/total instead", cargoId, cargoId);
         long total = votoService.getTotalVotosByCargo(cargoId);
         return ResponseEntity.ok(total);
     }
@@ -205,16 +253,29 @@ public class VotoController {
         return ResponseEntity.ok(estatisticas);
     }
 
-    @GetMapping("/cargo/{cargoId}/estatisticas")
+    @GetMapping("/eleicao/{eleicaoId}/estatisticas-detalhadas")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
-    @Operation(summary = "Estatísticas do cargo", description = "Retorna estatísticas de votação de um cargo")
+    @Operation(summary = "Estatísticas detalhadas", description = "Retorna estatísticas detalhadas de uma eleição")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Estatísticas retornadas com sucesso"),
             @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
-    public ResponseEntity<Map<String, Long>> getEstatisticasPorCargo(@PathVariable UUID cargoId) {
-        Map<String, Long> estatisticas = votoService.getEstatisticasPorCargo(cargoId);
+    public ResponseEntity<Map<String, Object>> getResumoVotacaoDetalhado(@PathVariable UUID eleicaoId) {
+        Map<String, Object> resumo = votoService.getResumoVotacaoDetalhado(eleicaoId);
+        return ResponseEntity.ok(resumo);
+    }
+
+    @GetMapping("/cargo-pretendido/{cargoPretendidoId}/estatisticas")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
+    @Operation(summary = "Estatísticas do cargo", description = "Retorna estatísticas de votação de um cargo pretendido")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Estatísticas retornadas com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<Map<String, Long>> getEstatisticasPorCargo(@PathVariable UUID cargoPretendidoId) {
+        Map<String, Long> estatisticas = votoService.getEstatisticasPorCargo(cargoPretendidoId);
         return ResponseEntity.ok(estatisticas);
     }
 
@@ -229,6 +290,21 @@ public class VotoController {
     public ResponseEntity<List<Map<String, Object>>> getResultadosPorCandidato(@PathVariable UUID eleicaoId) {
         List<Map<String, Object>> resultados = votoService.getResultadosPorCandidato(eleicaoId);
         return ResponseEntity.ok(resultados);
+    }
+
+    @GetMapping("/eleicao/{eleicaoId}/cargo-pretendido/{cargoPretendidoId}/ranking")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
+    @Operation(summary = "Ranking por cargo", description = "Retorna ranking de candidatos por cargo pretendido")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Ranking retornado com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<List<Map<String, Object>>> getRankingCandidatosPorCargo(
+            @PathVariable UUID eleicaoId,
+            @PathVariable UUID cargoPretendidoId) {
+        List<Map<String, Object>> ranking = votoService.getRankingCandidatosPorCargo(eleicaoId, cargoPretendidoId);
+        return ResponseEntity.ok(ranking);
     }
 
     @GetMapping("/eleicao/{eleicaoId}/progresso")
@@ -259,7 +335,7 @@ public class VotoController {
     }
 
     @GetMapping("/membro/{membroId}/elegivel")
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO') or #membroId == authentication.name")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO') or #membroId.toString() == authentication.name")
     @Operation(summary = "Verificar elegibilidade", description = "Verifica se um membro está elegível para votar")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Verificação realizada com sucesso"),
@@ -279,13 +355,29 @@ public class VotoController {
             @ApiResponse(responseCode = "400", description = "Dados de votação inválidos"),
             @ApiResponse(responseCode = "401", description = "Token inválido ou expirado")
     })
-    public ResponseEntity<List<String>> validarVotacao(
+    public ResponseEntity<ValidarVotacaoResponse> validarVotacao(
             @Valid @RequestBody VotarRequest request,
             Authentication authentication) {
 
-        UUID membroId = UUID.fromString(authentication.getName());
+        UUID membroId = extractMembroId(authentication);
         List<String> erros = votoService.validarVotacao(membroId, request);
-        return ResponseEntity.ok(erros);
+
+        // Criar response estruturado
+        boolean membroElegivel = votoService.isMembroElegivelParaVotar(membroId);
+        boolean eleicaoDisponivel = votoService.isEleicaoDisponivelParaVotacao(request.getEleicaoId());
+        boolean jaVotou = votoService.membroJaVotou(membroId, request.getEleicaoId());
+
+        ValidarVotacaoResponse response = ValidarVotacaoResponse.builder()
+                .votacaoValida(erros.isEmpty())
+                .erros(erros)
+                .avisos(List.of()) // TODO: Implementar avisos se necessário
+                .totalVotos(request.getVotos() != null ? request.getVotos().size() : 0)
+                .membroElegivel(membroElegivel)
+                .eleicaoDisponivel(eleicaoDisponivel)
+                .jaVotou(jaVotou)
+                .build();
+
+        return ResponseEntity.ok(response);
     }
 
     // === AUDITORIA ===
@@ -342,7 +434,45 @@ public class VotoController {
         return ResponseEntity.ok(votos);
     }
 
+    @GetMapping("/eleicao/{eleicaoId}/seguranca")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @Operation(summary = "Análise de segurança", description = "Retorna análise de segurança da votação")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Análise retornada com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<Map<String, Object>> getAnaliseSeguranca(@PathVariable UUID eleicaoId) {
+        Map<String, Object> analise = votoService.getAnaliseSeguranca(eleicaoId);
+        return ResponseEntity.ok(analise);
+    }
+
+    // === BÚSCA E FILTROS ===
+
+    @PostMapping("/buscar")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
+    @Operation(summary = "Buscar votos com filtros", description = "Busca votos com filtros customizados")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Resultados retornados com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<Page<VotoResponse>> buscarVotosComFiltros(
+            @RequestBody @Valid VotoFilterRequest filtros,
+            @PageableDefault(size = 50) Pageable pageable) {
+        // TODO: Implementar busca com filtros no service
+        return ResponseEntity.ok(Page.empty()); // Implementação temporária
+    }
+
     // === MÉTODOS UTILITÁRIOS ===
+
+    private UUID extractMembroId(Authentication authentication) {
+        try {
+            return UUID.fromString(authentication.getName());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("ID do membro inválido no token de autenticação");
+        }
+    }
 
     private String getClientIpAddress(HttpServletRequest request) {
         String xForwardedFor = request.getHeader("X-Forwarded-For");
@@ -355,6 +485,11 @@ public class VotoController {
             return xRealIp;
         }
 
+        String xOriginalForwardedFor = request.getHeader("X-Original-Forwarded-For");
+        if (xOriginalForwardedFor != null && !xOriginalForwardedFor.isEmpty()) {
+            return xOriginalForwardedFor.split(",")[0].trim();
+        }
+
         return request.getRemoteAddr();
     }
 
@@ -362,6 +497,8 @@ public class VotoController {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException e, HttpServletRequest request) {
+        log.error("Erro de argumento inválido no VotoController: {}", e.getMessage());
+
         ErrorResponse error = ErrorResponse.builder()
                 .code("INVALID_REQUEST")
                 .message(e.getMessage())
@@ -373,6 +510,8 @@ public class VotoController {
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ErrorResponse> handleIllegalState(IllegalStateException e, HttpServletRequest request) {
+        log.error("Erro de estado inválido no VotoController: {}", e.getMessage());
+
         ErrorResponse error = ErrorResponse.builder()
                 .code("INVALID_STATE")
                 .message(e.getMessage())
@@ -382,9 +521,23 @@ public class VotoController {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
 
+    @ExceptionHandler(SecurityException.class)
+    public ResponseEntity<ErrorResponse> handleSecurityException(SecurityException e, HttpServletRequest request) {
+        log.error("Erro de segurança no VotoController: {}", e.getMessage());
+
+        ErrorResponse error = ErrorResponse.builder()
+                .code("SECURITY_ERROR")
+                .message("Acesso negado ou token inválido")
+                .path(request.getRequestURI())
+                .timestamp(java.time.LocalDateTime.now())
+                .build();
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+    }
+
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ErrorResponse> handleRuntimeException(RuntimeException e, HttpServletRequest request) {
         log.error("Erro interno no VotoController", e);
+
         ErrorResponse error = ErrorResponse.builder()
                 .code("INTERNAL_ERROR")
                 .message("Erro interno do servidor")
@@ -394,12 +547,12 @@ public class VotoController {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
     }
 
-    // ErrorResponse DTO interno
+    // === ERROR RESPONSE DTO ===
     @lombok.Data
     @lombok.Builder
     @lombok.NoArgsConstructor
     @lombok.AllArgsConstructor
-    private static class ErrorResponse {
+    public static class ErrorResponse {
         private String code;
         private String message;
         private String path;

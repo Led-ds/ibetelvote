@@ -11,13 +11,15 @@ import java.util.UUID;
 @Entity
 @Table(name = "votos", indexes = {
         @Index(name = "idx_voto_eleicao_id", columnList = "eleicao_id"),
-        @Index(name = "idx_voto_cargo_id", columnList = "cargo_id"),
-        @Index(name = "idx_voto_membro_id", columnList = "membro_id"),
         @Index(name = "idx_voto_candidato_id", columnList = "candidato_id"),
+        @Index(name = "idx_voto_membro_id", columnList = "membro_id"),
+        @Index(name = "idx_voto_cargo_pretendido_id", columnList = "cargo_pretendido_id"),
         @Index(name = "idx_voto_data", columnList = "data_voto"),
-        @Index(name = "idx_voto_hash", columnList = "hash_voto")
+        @Index(name = "idx_voto_hash", columnList = "hash_voto"),
+        @Index(name = "idx_voto_tipo", columnList = "voto_branco, voto_nulo")
 }, uniqueConstraints = {
-        @UniqueConstraint(name = "uk_voto_membro_cargo", columnNames = {"membro_id", "cargo_id", "eleicao_id"})
+        @UniqueConstraint(name = "uk_voto_membro_cargo_eleicao",
+                columnNames = {"membro_id", "cargo_pretendido_id", "eleicao_id"})
 })
 @Getter
 @Setter
@@ -40,11 +42,10 @@ public class Voto {
     @Column(name = "eleicao_id", nullable = false)
     private UUID eleicaoId;
 
-    @NotNull(message = "Cargo é obrigatório")
-    @Column(name = "cargo_id", nullable = false)
-    private UUID cargoId;
+    @NotNull(message = "Cargo pretendido é obrigatório")
+    @Column(name = "cargo_pretendido_id", nullable = false)
+    private UUID cargoPretendidoId;
 
-    // Candidato é opcional (voto em branco ou nulo não tem candidato)
     @Column(name = "candidato_id")
     private UUID candidatoId;
 
@@ -79,52 +80,76 @@ public class Voto {
     private Eleicao eleicao;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cargo_id", insertable = false, updatable = false)
-    private Cargo cargo;
+    @JoinColumn(name = "cargo_pretendido_id", insertable = false, updatable = false)
+    private Cargo cargoPretendido;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "candidato_id", insertable = false, updatable = false)
     private Candidato candidato;
 
-    // === MÉTODOS DE NEGÓCIO ===
+    // === MÉTODOS DE CRIAÇÃO (FACTORY METHODS) ===
 
-    public static Voto criarVotoValido(UUID membroId, UUID eleicaoId, UUID cargoId, UUID candidatoId) {
+    /**
+     * Cria um voto válido para um candidato específico
+     */
+    public static Voto criarVotoValido(UUID membroId, UUID eleicaoId, UUID candidatoId) {
         return Voto.builder()
                 .membroId(membroId)
                 .eleicaoId(eleicaoId)
-                .cargoId(cargoId)
                 .candidatoId(candidatoId)
+                .cargoPretendidoId(null) // Será definido após buscar o candidato
                 .votoBranco(false)
                 .votoNulo(false)
                 .build();
     }
 
-    public static Voto criarVotoBranco(UUID membroId, UUID eleicaoId, UUID cargoId) {
+    /**
+     * Cria um voto em branco para um cargo específico
+     */
+    public static Voto criarVotoBranco(UUID membroId, UUID eleicaoId, UUID cargoPretendidoId) {
         return Voto.builder()
                 .membroId(membroId)
                 .eleicaoId(eleicaoId)
-                .cargoId(cargoId)
+                .cargoPretendidoId(cargoPretendidoId)
                 .candidatoId(null)
                 .votoBranco(true)
                 .votoNulo(false)
                 .build();
     }
 
-    public static Voto criarVotoNulo(UUID membroId, UUID eleicaoId, UUID cargoId) {
+    /**
+     * Cria um voto nulo para um cargo específico
+     */
+    public static Voto criarVotoNulo(UUID membroId, UUID eleicaoId, UUID cargoPretendidoId) {
         return Voto.builder()
                 .membroId(membroId)
                 .eleicaoId(eleicaoId)
-                .cargoId(cargoId)
+                .cargoPretendidoId(cargoPretendidoId)
                 .candidatoId(null)
                 .votoBranco(false)
                 .votoNulo(true)
                 .build();
     }
 
+    /**
+     * Define o cargo pretendido baseado no candidato escolhido
+     */
+    public void definirCargoPretendidoPorCandidato(Candidato candidato) {
+        if (candidato != null) {
+            this.cargoPretendidoId = candidato.getCargoPretendidoId();
+        }
+    }
+
+    /**
+     * Define o hash de segurança do voto
+     */
     public void definirHashSeguranca(String hash) {
         this.hashVoto = hash;
     }
 
+    /**
+     * Define os dados de origem da votação
+     */
     public void definirDadosOrigem(String ipOrigem, String userAgent) {
         this.ipOrigem = ipOrigem;
         this.userAgent = userAgent;
@@ -132,32 +157,51 @@ public class Voto {
 
     // === MÉTODOS DE VALIDAÇÃO ===
 
+    /**
+     * Verifica se é um voto válido (tem candidato e não é branco/nulo)
+     */
     public boolean isVotoValido() {
         return candidatoId != null && !isVotoBranco() && !isVotoNulo();
     }
 
+    /**
+     * Verifica se é um voto em branco
+     */
     public boolean isVotoBranco() {
         return votoBranco != null && votoBranco;
     }
 
+    /**
+     * Verifica se é um voto nulo
+     */
     public boolean isVotoNulo() {
         return votoNulo != null && votoNulo;
     }
 
+    /**
+     * Verifica se tem candidato associado
+     */
     public boolean temCandidato() {
         return candidatoId != null;
     }
 
+    /**
+     * Verifica se tem hash de segurança
+     */
     public boolean temHash() {
         return hashVoto != null && !hashVoto.trim().isEmpty();
     }
 
+    /**
+     * Verifica se o voto tem dados de segurança
+     */
     public boolean isVotoSeguro() {
         return temHash() && ipOrigem != null;
     }
 
-    // === MÉTODOS UTILITÁRIOS ===
-
+    /**
+     * Retorna o tipo do voto como string
+     */
     public String getTipoVoto() {
         if (isVotoValido()) {
             return "Válido";
@@ -170,6 +214,9 @@ public class Voto {
         }
     }
 
+    /**
+     * Retorna o nome do candidato ou tipo de voto
+     */
     public String getNomeCandidato() {
         if (candidato != null) {
             return candidato.getNomeCandidato();
@@ -177,6 +224,9 @@ public class Voto {
         return getTipoVoto();
     }
 
+    /**
+     * Retorna o número do candidato ou tipo de voto
+     */
     public String getNumeroCandidato() {
         if (candidato != null && candidato.temNumero()) {
             return candidato.getNumeroCandidato();
@@ -184,24 +234,36 @@ public class Voto {
         return getTipoVoto().toUpperCase();
     }
 
+    /**
+     * Retorna o nome do membro votante
+     */
     public String getNomeMembro() {
         return membro != null ? membro.getNome() : "Desconhecido";
     }
 
-    public String getNomeCargo() {
-        return cargo != null ? cargo.getNome() : "Desconhecido";
+    public String getNomeCargoPretendido() {
+        return cargoPretendido != null ? cargoPretendido.getNome() : "Desconhecido";
     }
 
+    /**
+     * Retorna o nome da eleição
+     */
     public String getNomeEleicao() {
         return eleicao != null ? eleicao.getNome() : "Desconhecida";
     }
 
+    /**
+     * Retorna a data formatada da votação
+     */
     public String getDataVotoFormatada() {
         return dataVoto != null ?
                 dataVoto.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")) :
                 "Data não disponível";
     }
 
+    /**
+     * Retorna o IP mascarado para proteção de privacidade
+     */
     public String getIpMascarado() {
         if (ipOrigem == null) {
             return "IP não registrado";
@@ -216,6 +278,9 @@ public class Voto {
 
     // === MÉTODOS DE AUDITORIA ===
 
+    /**
+     * Retorna um resumo do voto para auditoria
+     */
     public String getResumoVoto() {
         return String.format("Voto %s - %s - %s em %s",
                 getTipoVoto(),
@@ -224,15 +289,30 @@ public class Voto {
                 getDataVotoFormatada());
     }
 
-    public boolean isSameVote(UUID membroId, UUID cargoId, UUID eleicaoId) {
+    /**
+     * Verifica se é o mesmo voto (mesmo membro, cargo e eleição)
+     */
+    public boolean isSameVote(UUID membroId, UUID cargoPretendidoId, UUID eleicaoId) {
         return this.membroId.equals(membroId) &&
-                this.cargoId.equals(cargoId) &&
+                this.cargoPretendidoId.equals(cargoPretendidoId) &&
                 this.eleicaoId.equals(eleicaoId);
     }
 
-    // === VALIDAÇÕES DE NEGÓCIO ===
-
+    /**
+     * Valida a consistência interna do voto
+     */
     public void validarConsistencia() {
+        // Validar IDs obrigatórios
+        if (membroId == null) {
+            throw new IllegalStateException("Membro é obrigatório");
+        }
+        if (eleicaoId == null) {
+            throw new IllegalStateException("Eleição é obrigatória");
+        }
+        if (cargoPretendidoId == null) {
+            throw new IllegalStateException("Cargo pretendido é obrigatório");
+        }
+
         // Validar que não pode ser branco E nulo ao mesmo tempo
         if (isVotoBranco() && isVotoNulo()) {
             throw new IllegalStateException("Voto não pode ser branco e nulo simultaneamente");
@@ -249,8 +329,35 @@ public class Voto {
         }
     }
 
+    public void validarCandidatoCompativel() {
+        if (candidato != null && cargoPretendidoId != null) {
+            if (!candidato.getCargoPretendidoId().equals(this.cargoPretendidoId)) {
+                throw new IllegalStateException("Candidato não pertence ao cargo pretendido especificado");
+            }
+        }
+    }
+
+    public void validarElegibilidadeMembro() {
+        if (membro != null && cargoPretendido != null) {
+            // TODO: Implementar validações específicas se necessário
+            // Por exemplo, verificar se membro pode votar em determinados cargos
+        }
+    }
+
+    /**
+     * Executa todas as validações do voto
+     */
+    public void validarVotoCompleto() {
+        validarConsistencia();
+        validarCandidatoCompativel();
+        validarElegibilidadeMembro();
+    }
+
     // === MÉTODOS ESTÁTICOS UTILITÁRIOS ===
 
+    /**
+     * Gera hash de segurança para o voto
+     */
     public static String gerarHashVoto(UUID membroId, UUID candidatoId, LocalDateTime dataVoto) {
         String input = membroId.toString() +
                 (candidatoId != null ? candidatoId.toString() : "VOTO_ESPECIAL") +
@@ -271,5 +378,65 @@ public class Voto {
         } catch (Exception e) {
             return UUID.randomUUID().toString().replace("-", "");
         }
+    }
+
+    public static boolean isTipoVotoPermitido(boolean votoBranco, boolean votoNulo, UUID candidatoId) {
+        // Exatamente um tipo deve ser verdadeiro
+        int tiposAtivos = 0;
+        if (votoBranco) tiposAtivos++;
+        if (votoNulo) tiposAtivos++;
+        if (candidatoId != null) tiposAtivos++;
+
+        return tiposAtivos == 1;
+    }
+
+    // === MÉTODOS DE INFORMAÇÃO ADICIONAL ===
+
+    /**
+     * Retorna informações do cargo atual do membro
+     */
+    public String getCargoAtualMembro() {
+        return membro != null ? membro.getNomeCargoAtual() : null;
+    }
+
+    /**
+     * Retorna o email do membro (para auditoria)
+     */
+    public String getEmailMembro() {
+        return membro != null ? membro.getEmail() : null;
+    }
+
+    /**
+     * Verifica se o membro está ativo
+     */
+    public boolean isMembroAtivo() {
+        return membro != null && membro.isActive();
+    }
+
+    /**
+     * Verifica se a eleição está ativa
+     */
+    public boolean isEleicaoAtiva() {
+        return eleicao != null && eleicao.isAtiva();
+    }
+
+    /**
+     * Verifica se o cargo está ativo
+     */
+    public boolean isCargoAtivoElegivel() {
+        return cargoPretendido != null && cargoPretendido.isAtivo();
+    }
+
+    /**
+     * Verifica se o candidato pode receber votos
+     */
+    public boolean candidatoPodeReceberVotos() {
+        return candidato != null && candidato.podeReceberVotos();
+    }
+
+    @Override
+    public String toString() {
+        return String.format("Voto{id=%s, tipo=%s, membro=%s, cargo=%s, eleicao=%s}",
+                id, getTipoVoto(), getNomeMembro(), getNomeCargoPretendido(), getNomeEleicao());
     }
 }
