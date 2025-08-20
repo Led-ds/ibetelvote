@@ -16,13 +16,14 @@ import java.util.UUID;
 @Entity
 @Table(name = "candidatos", indexes = {
         @Index(name = "idx_candidato_eleicao_id", columnList = "eleicao_id"),
-        @Index(name = "idx_candidato_cargo_id", columnList = "cargo_id"),
+        @Index(name = "idx_candidato_cargo_pretendido_id", columnList = "cargo_pretendido_id"),
         @Index(name = "idx_candidato_membro_id", columnList = "membro_id"),
         @Index(name = "idx_candidato_numero", columnList = "numero_candidato"),
-        @Index(name = "idx_candidato_ativo", columnList = "ativo")
+        @Index(name = "idx_candidato_ativo", columnList = "ativo"),
+        @Index(name = "idx_candidato_aprovado", columnList = "aprovado")
 }, uniqueConstraints = {
         @UniqueConstraint(name = "uk_candidato_numero_eleicao", columnNames = {"numero_candidato", "eleicao_id"}),
-        @UniqueConstraint(name = "uk_candidato_membro_cargo", columnNames = {"membro_id", "cargo_id"})
+        @UniqueConstraint(name = "uk_candidato_membro_cargo_eleicao", columnNames = {"membro_id", "cargo_pretendido_id", "eleicao_id"})
 })
 @Getter
 @Setter
@@ -45,9 +46,9 @@ public class Candidato {
     @Column(name = "eleicao_id", nullable = false)
     private UUID eleicaoId;
 
-    @NotNull(message = "Cargo é obrigatório")
-    @Column(name = "cargo_id", nullable = false)
-    private UUID cargoId;
+    @NotNull(message = "Cargo pretendido é obrigatório")
+    @Column(name = "cargo_pretendido_id", nullable = false)
+    private UUID cargoPretendidoId;
 
     @Column(name = "numero_candidato", length = 10)
     private String numeroCandidato;
@@ -55,9 +56,6 @@ public class Candidato {
     @NotBlank(message = "Nome do candidato é obrigatório")
     @Column(name = "nome_candidato", nullable = false, length = 100)
     private String nomeCandidato;
-
-    @Column(name = "nome_cargo_pretendido", length = 100)
-    private String nomeCargoRetendido;
 
     @Column(name = "descricao_candidatura", columnDefinition = "TEXT")
     private String descricaoCandidatura;
@@ -110,99 +108,187 @@ public class Candidato {
     private Eleicao eleicao;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cargo_id", insertable = false, updatable = false)
-    private Cargo cargo;
+    @JoinColumn(name = "cargo_pretendido_id", insertable = false, updatable = false)
+    private Cargo cargoPretendido;
 
     @OneToMany(mappedBy = "candidato", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default
     private List<Voto> votos = new ArrayList<>();
 
-    // === MÉTODOS DE NEGÓCIO ===
-
-    public void updateCandidatura(String nomeCandidato, String nomeCargoRetendido,
-                                  String descricaoCandidatura, String propostas, String experiencia) {
+    /**
+     * Atualiza dados básicos da candidatura
+     */
+    public void updateCandidatura(String nomeCandidato, String descricaoCandidatura,
+                                  String propostas, String experiencia) {
         this.nomeCandidato = nomeCandidato;
-        this.nomeCargoRetendido = nomeCargoRetendido;
         this.descricaoCandidatura = descricaoCandidatura;
         this.propostas = propostas;
         this.experiencia = experiencia;
     }
 
+    /**
+     * Atualiza foto da campanha
+     */
     public void updateFotoCampanha(byte[] fotoCampanhaData, String fotoCampanhaTipo, String fotoCampanhaNome) {
         this.fotoCampanhaData = fotoCampanhaData;
         this.fotoCampanhaTipo = fotoCampanhaTipo;
         this.fotoCampanhaNome = fotoCampanhaNome;
     }
 
+    /**
+     * Remove foto da campanha
+     */
     public void removeFotoCampanha() {
         this.fotoCampanhaData = null;
         this.fotoCampanhaTipo = null;
         this.fotoCampanhaNome = null;
     }
 
+    /**
+     * Ativa a candidatura
+     */
     public void activate() {
         this.ativo = true;
     }
 
+    /**
+     * Desativa a candidatura
+     */
     public void deactivate() {
         this.ativo = false;
     }
 
+    /**
+     * Aprova a candidatura
+     */
     public void aprovar() {
         this.aprovado = true;
         this.dataAprovacao = LocalDateTime.now();
         this.motivoReprovacao = null;
     }
 
+    /**
+     * Reprova a candidatura
+     */
     public void reprovar(String motivo) {
         this.aprovado = false;
         this.motivoReprovacao = motivo;
         this.dataAprovacao = null;
     }
 
+    /**
+     * Define número do candidato
+     */
     public void definirNumero(String numeroCandidato) {
         this.numeroCandidato = numeroCandidato;
     }
 
-    // === MÉTODOS DE VALIDAÇÃO ===
+    /**
+     * Atualiza cargo pretendido
+     */
+    public void updateCargoPretendido(UUID cargoPretendidoId) {
+        this.cargoPretendidoId = cargoPretendidoId;
+    }
 
+    /**
+     * Verifica se a candidatura está ativa
+     */
     public boolean isAtivo() {
         return ativo != null && ativo;
     }
 
+    /**
+     * Verifica se a candidatura está aprovada
+     */
     public boolean isAprovado() {
         return aprovado != null && aprovado;
     }
 
+    /**
+     * Verifica se a candidatura está reprovada
+     */
     public boolean isReprovado() {
         return !isAprovado();
     }
 
+    /**
+     * Verifica se pode receber votos
+     */
     public boolean podeReceberVotos() {
         return isAtivo() && isAprovado() &&
                 eleicao != null && eleicao.isVotacaoAberta();
     }
 
+    /**
+     * Verifica se tem foto de campanha
+     */
     public boolean temFotoCampanha() {
         return fotoCampanhaData != null && fotoCampanhaData.length > 0;
     }
 
+    /**
+     * Verifica se tem número definido
+     */
     public boolean temNumero() {
         return numeroCandidato != null && !numeroCandidato.trim().isEmpty();
     }
 
+    /**
+     * Verifica se a candidatura está completa
+     */
     public boolean isCandidaturaCompleta() {
         return nomeCandidato != null && !nomeCandidato.trim().isEmpty() &&
                 descricaoCandidatura != null && !descricaoCandidatura.trim().isEmpty() &&
                 propostas != null && !propostas.trim().isEmpty();
     }
 
+    /**
+     * Verifica se o membro pode se candidatar ao cargo pretendido
+     */
+    public boolean membroPodeSeCandidarParaCargo() {
+        if (membro == null || cargoPretendido == null) {
+            return false;
+        }
+        return membro.podeSeCandidarPara(cargoPretendido);
+    }
+
+    /**
+     * Verifica se a candidatura é elegível (todas as validações)
+     */
+    public boolean isElegivel() {
+        return isAtivo() &&
+                membro != null && membro.isActive() &&
+                cargoPretendido != null && cargoPretendido.isAtivo() &&
+                membroPodeSeCandidarParaCargo() &&
+                isCandidaturaCompleta();
+    }
+
     // === MÉTODOS UTILITÁRIOS ===
 
+    /**
+     * Retorna total de votos recebidos
+     */
     public int getTotalVotos() {
         return votos != null ? votos.size() : 0;
     }
 
+    /**
+     * Retorna nome do cargo pretendido
+     */
+    public String getNomeCargoPretendido() {
+        return cargoPretendido != null ? cargoPretendido.getNome() : "Cargo não definido";
+    }
+
+    /**
+     * Retorna nome do membro
+     */
+    public String getNomeMembro() {
+        return membro != null ? membro.getNome() : nomeCandidato;
+    }
+
+    /**
+     * Retorna status da candidatura
+     */
     public String getStatusCandidatura() {
         if (!isAtivo()) {
             return "Inativo";
@@ -219,35 +305,69 @@ public class Candidato {
         return "Disponível para votação";
     }
 
+    /**
+     * Retorna nome para exibição
+     */
     public String getDisplayName() {
         return nomeCandidato;
     }
 
+    /**
+     * Retorna número formatado
+     */
     public String getNumeroFormatado() {
         return numeroCandidato != null ? numeroCandidato : "S/N";
     }
 
+    /**
+     * Calcula percentual de votos em relação ao total de votos válidos do cargo
+     */
     public double getPercentualVotos() {
-        if (cargo == null || cargo.getTotalVotosValidos() == 0) {
+        if (eleicao == null) {
             return 0.0;
         }
-        return (getTotalVotos() * 100.0) / cargo.getTotalVotosValidos();
+
+        // Contar total de votos válidos para o mesmo cargo na eleição
+        long totalVotosValidosCargo = eleicao.getVotos().stream()
+                .filter(voto -> voto.getCandidatoId() != null)
+                .filter(voto -> {
+                    if (voto.getCandidato() != null && voto.getCandidato().getCargoPretendidoId() != null) {
+                        return voto.getCandidato().getCargoPretendidoId().equals(this.cargoPretendidoId);
+                    }
+                    return false;
+                })
+                .count();
+
+        if (totalVotosValidosCargo == 0) {
+            return 0.0;
+        }
+
+        return (getTotalVotos() * 100.0) / totalVotosValidosCargo;
     }
 
+    /**
+     * Retorna resumo da votação
+     */
     public String getResumoVotacao() {
         int votos = getTotalVotos();
         double percentual = getPercentualVotos();
         return String.format("%d votos (%.1f%%)", votos, percentual);
     }
 
+    /**
+     * Retorna foto de campanha como Base64
+     */
     @Transient
     public String getFotoCampanhaBase64() {
         if (temFotoCampanha()) {
-            return java.util.Base64.getEncoder().encodeToString(fotoCampanhaData);
+            return Base64.getEncoder().encodeToString(fotoCampanhaData);
         }
         return null;
     }
 
+    /**
+     * Retorna foto como Data URI
+     */
     public String getFotoCampanhaDataUri() {
         if (temFotoCampanha() && fotoCampanhaTipo != null) {
             String base64 = getFotoCampanhaBase64();
@@ -256,35 +376,105 @@ public class Candidato {
         return null;
     }
 
+    /**
+     * Retorna tamanho da foto em bytes
+     */
     public long getFotoCampanhaSize() {
         return temFotoCampanha() ? fotoCampanhaData.length : 0;
     }
 
     // === MÉTODOS DE INFORMAÇÃO ===
 
-    public String getNomeCompletoMembro() {
-        return membro != null ? membro.getNome() : nomeCandidato;
+    /**
+     * Retorna cargo atual do membro
+     */
+    public String getCargoAtualMembro() {
+        return membro != null ? membro.getNomeCargoAtual() : null;
     }
 
-    public String getCargoMembro() {
-        return membro != null ? membro.getCargo() : null;
-    }
-
+    /**
+     * Retorna email do membro
+     */
     public String getEmailMembro() {
         return membro != null ? membro.getEmail() : null;
     }
 
+    /**
+     * Verifica se membro está ativo
+     */
     public boolean isMembroAtivo() {
         return membro != null && membro.isActive();
     }
 
-    // === MÉTODOS DE COMPARAÇÃO ===
+    /**
+     * Retorna nome da eleição
+     */
+    public String getNomeEleicao() {
+        return eleicao != null ? eleicao.getNome() : "Eleição não definida";
+    }
 
+    /**
+     * Compara candidatos por total de votos (para ordenação)
+     */
     public int compareVotos(Candidato outro) {
         return Integer.compare(outro.getTotalVotos(), this.getTotalVotos());
     }
 
+    /**
+     * Verifica se tem mais votos que outro candidato
+     */
     public boolean temMaisVotosQue(Candidato outro) {
         return this.getTotalVotos() > outro.getTotalVotos();
+    }
+
+    /**
+     * Verifica se é candidato do mesmo cargo
+     */
+    public boolean isMesmoCargo(Candidato outro) {
+        return this.cargoPretendidoId != null &&
+                this.cargoPretendidoId.equals(outro.getCargoPretendidoId());
+    }
+
+    /**
+     * Valida se todos os dados obrigatórios estão preenchidos
+     */
+    public void validarDadosObrigatorios() {
+        if (membroId == null) {
+            throw new IllegalStateException("Membro é obrigatório");
+        }
+        if (eleicaoId == null) {
+            throw new IllegalStateException("Eleição é obrigatória");
+        }
+        if (cargoPretendidoId == null) {
+            throw new IllegalStateException("Cargo pretendido é obrigatório");
+        }
+        if (nomeCandidato == null || nomeCandidato.trim().isEmpty()) {
+            throw new IllegalStateException("Nome do candidato é obrigatório");
+        }
+    }
+
+    /**
+     * Valida se a candidatura pode ser aprovada
+     */
+    public void validarParaAprovacao() {
+        validarDadosObrigatorios();
+
+        if (!isCandidaturaCompleta()) {
+            throw new IllegalStateException("Candidatura incompleta - faltam dados obrigatórios");
+        }
+
+        if (!membroPodeSeCandidarParaCargo()) {
+            throw new IllegalStateException("Membro não atende aos requisitos hierárquicos para o cargo pretendido");
+        }
+
+        if (!isMembroAtivo()) {
+            throw new IllegalStateException("Membro deve estar ativo para ser candidato");
+        }
+    }
+
+    @Override
+    public String toString() {
+        return String.format("Candidato{id=%s, nome='%s', cargo='%s', ativo=%s, aprovado=%s}",
+                id, nomeCandidato, getNomeCargoPretendido(), ativo, aprovado);
     }
 }

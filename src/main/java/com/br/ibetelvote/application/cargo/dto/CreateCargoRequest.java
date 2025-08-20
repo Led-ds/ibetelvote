@@ -1,8 +1,6 @@
-package com.br.ibetelvote.application.eleicao.dto;
+package com.br.ibetelvote.application.cargo.dto;
 
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -12,13 +10,15 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UpdateCargoRequest {
+public class CreateCargoRequest {
 
+    @NotBlank(message = "Nome do cargo é obrigatório")
     @Size(min = 3, max = 100, message = "Nome deve ter entre 3 e 100 caracteres")
     private String nome;
 
     @Size(max = 1000, message = "Descrição deve ter no máximo 1000 caracteres")
     private String descricao;
 
-    private Boolean ativo;
+    @Builder.Default
+    private Boolean ativo = true;
 }

@@ -1,4 +1,4 @@
-package com.br.ibetelvote.application.eleicao.dto;
+package com.br.ibetelvote.application.candidato.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,8 +16,11 @@ public class CandidatoBasicInfo {
     private UUID id;
     private String nomeCandidato;
     private String numeroCandidato;
-    private Boolean temFotoCampanha;
+    private UUID cargoPretendidoId;
+    private String nomeCargoPretendido;
+    private Boolean ativo;
     private Boolean aprovado;
+    private boolean temFotoCampanha;
     private int totalVotos;
-    private String nomeCargoRetendido;
+    private String statusCandidatura;
 }

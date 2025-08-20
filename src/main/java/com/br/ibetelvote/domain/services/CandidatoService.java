@@ -1,6 +1,8 @@
 package com.br.ibetelvote.domain.services;
 
-import com.br.ibetelvote.application.eleicao.dto.*;
+import com.br.ibetelvote.application.candidato.dto.CandidatoResponse;
+import com.br.ibetelvote.application.candidato.dto.CreateCandidatoRequest;
+import com.br.ibetelvote.application.candidato.dto.UpdateCandidatoRequest;
 import com.br.ibetelvote.application.shared.dto.UploadPhotoResponse;
 import org.springframework.web.multipart.MultipartFile;
 

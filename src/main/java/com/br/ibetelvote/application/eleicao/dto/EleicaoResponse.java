@@ -1,5 +1,7 @@
 package com.br.ibetelvote.application.eleicao.dto;
 
+import com.br.ibetelvote.application.candidato.dto.CandidatoBasicInfo;
+import com.br.ibetelvote.application.cargo.dto.CargoBasicInfo;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

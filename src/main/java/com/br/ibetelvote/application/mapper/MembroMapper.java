@@ -1,7 +1,7 @@
 package com.br.ibetelvote.application.mapper;
 
-import com.br.ibetelvote.application.eleicao.dto.CargoBasicInfo;
-import com.br.ibetelvote.application.eleicao.dto.MembroBasicInfo;
+import com.br.ibetelvote.application.cargo.dto.CargoBasicInfo;
+import com.br.ibetelvote.application.membro.dto.MembroBasicInfo;
 import com.br.ibetelvote.application.membro.dto.*;
 import com.br.ibetelvote.domain.entities.Cargo;
 import com.br.ibetelvote.domain.entities.Membro;
