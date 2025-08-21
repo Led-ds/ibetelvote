@@ -10,28 +10,47 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface EleicaoRepository {
-    Page<Eleicao> findAll(Pageable pageable);
+
+    // === OPERAÇÕES BÁSICAS ===
     void deleteById(UUID id);
-    boolean existsById(UUID id);
     long count();
 
-    // Consultas por status
+    // === CONSULTAS COM CANDIDATOS ===
+    Optional<Eleicao> findByIdWithCandidatos(UUID id);
+    Optional<Eleicao> findByIdWithCandidatosAndVotos(UUID id);
+    List<Eleicao> findAllWithCandidatosAprovados();
+
+    // === CONSULTAS POR STATUS ===
     List<Eleicao> findByAtivaTrue();
     List<Eleicao> findByAtivaFalse();
     Optional<Eleicao> findEleicaoAtiva();
+    Optional<Eleicao> findEleicaoAtivaComCandidatos();
 
-    // Consultas por data
+    // === CONSULTAS POR DATA E PERÍODO ===
     List<Eleicao> findEleicoesAbertas();
     List<Eleicao> findEleicoesEncerradas();
     List<Eleicao> findEleicoesFuturas();
     List<Eleicao> findByDataInicioBetween(LocalDateTime inicio, LocalDateTime fim);
+    List<Eleicao> findEleicoesAtivasNoPeriodo(LocalDateTime inicio, LocalDateTime fim);
 
-    // Consultas específicas
+    // === CONSULTAS ESPECÍFICAS ===
     Page<Eleicao> findByNomeContainingIgnoreCase(String nome, Pageable pageable);
     List<Eleicao> findRecentEleicoes(int limit);
+    List<Eleicao> findEleicoesComCandidatosAprovados();
 
-    // Estatísticas
+    // === VALIDAÇÕES DE NEGÓCIO ===
+    boolean existeEleicaoAtivaNoMesmoPeriodo(LocalDateTime inicio, LocalDateTime fim, UUID excludeId);
+    boolean existeEleicaoAtiva();
+
+    // === ESTATÍSTICAS ===
     long countByAtivaTrue();
     long countEleicoesEncerradas();
     long countEleicoesFuturas();
+    long countEleicoesComCandidatos();
+    int countCargosComCandidatosNaEleicao(UUID eleicaoId);
+    int countCandidatosAprovadosNaEleicao(UUID eleicaoId);
+
+    // === CONSULTAS PARA RELATÓRIOS ===
+    List<Eleicao> findEleicoesParaRelatorio(LocalDateTime inicio, LocalDateTime fim);
+    List<Eleicao> findEleicoesComMaiorParticipacao(int limit);
 }

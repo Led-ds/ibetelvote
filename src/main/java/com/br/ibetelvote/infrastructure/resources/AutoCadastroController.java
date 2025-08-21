@@ -1,12 +1,8 @@
 package com.br.ibetelvote.infrastructure.resources;
 
 import com.br.ibetelvote.application.auth.dto.LoginResponse;
-import com.br.ibetelvote.application.membro.dto.CreateUserByMembroRequest;
+import com.br.ibetelvote.application.membro.dto.*;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.br.ibetelvote.application.membro.dto.MembroProfileResponse;
-import com.br.ibetelvote.application.membro.dto.UpdateMembroProfileRequest;
-import com.br.ibetelvote.application.membro.dto.ValidarMembroRequest;
-import com.br.ibetelvote.application.membro.dto.ValidarMembroResponse;
 import com.br.ibetelvote.application.shared.dto.UploadPhotoResponse;
 import com.br.ibetelvote.domain.services.AutoCadastroService;
 import com.br.ibetelvote.domain.services.MembroService;
@@ -39,7 +35,9 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -214,16 +212,23 @@ public class AutoCadastroController {
             @ApiResponse(responseCode = "413", description = "Arquivo muito grande"),
             @ApiResponse(responseCode = "404", description = "Membro não encontrado")
     })
-    public ResponseEntity<UploadPhotoResponse> uploadFotoPerfil(
+    public ResponseEntity<MembroResponse> uploadFotoPerfil(
             @Parameter(description = "Arquivo de imagem (JPG, PNG, WEBP) - Máx 5MB", required = true)
             @RequestParam("file") MultipartFile file,
-            Authentication authentication) {
+            Authentication authentication) throws IOException {
 
         UUID userId = extrairMembroIdDoToken(authentication);
         log.info("Upload de foto para membro: {}, arquivo: {}, tamanho: {} bytes",
                 userId, file.getOriginalFilename(), file.getSize());
 
-        UploadPhotoResponse response = membroService.uploadPhoto(userId, file);
+        MembroUploadFotoRequest uploadRequest = MembroUploadFotoRequest.builder()
+                .fotoData(convertToBase64(file))
+                .fotoTipo(file.getContentType())
+                .fotoNome(file.getOriginalFilename())
+                .build();
+
+        MembroResponse response = membroService.uploadFotoMembro(userId, uploadRequest);
+
         return ResponseEntity.ok(response);
     }
 
@@ -246,7 +251,7 @@ public class AutoCadastroController {
         UUID membroId = extrairMembroIdDoToken(authentication);
         log.info("Removendo foto do membro: {}", membroId);
 
-        membroService.removePhoto(membroId);
+        membroService.removeFotoMembro(membroId);
         return ResponseEntity.noContent().build();
     }
 
@@ -492,5 +497,44 @@ public class AutoCadastroController {
                 .build();
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+    }
+
+    // ===== ADICIONAR NO AutoCadastroController =====
+
+// Adicionar este método privado na classe AutoCadastroController:
+
+    /**
+     * Converte MultipartFile para Base64
+     */
+    private byte[] convertToBase64(MultipartFile file) throws IOException {
+        // Validações do arquivo
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Arquivo de foto é obrigatório");
+        }
+
+        // Validar tamanho (máximo 5MB)
+        if (file.getSize() > 5 * 1024 * 1024) {
+            throw new IllegalArgumentException("Arquivo deve ter no máximo 5MB");
+        }
+
+        // Validar tipo de arquivo
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new IllegalArgumentException("Arquivo deve ser uma imagem válida");
+        }
+
+        // Validar extensões permitidas
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename != null) {
+            String extension = originalFilename.toLowerCase();
+            if (!extension.endsWith(".jpg") &&
+                    !extension.endsWith(".jpeg") &&
+                    !extension.endsWith(".png") &&
+                    !extension.endsWith(".webp")) {
+                throw new IllegalArgumentException("Apenas arquivos JPG, PNG e WEBP são permitidos");
+            }
+        }
+
+        return file.getBytes();
     }
 }

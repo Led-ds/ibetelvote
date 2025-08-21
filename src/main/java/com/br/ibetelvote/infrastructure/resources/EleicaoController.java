@@ -25,51 +25,19 @@ import java.util.UUID;
 @RequestMapping("/api/v1/eleicoes")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Eleições", description = "Endpoints para gestão de eleições")
+@Tag(name = "Eleições", description = "Endpoints para gestão de eleições - Sistema refatorado")
 @SecurityRequirement(name = "bearerAuth")
 public class EleicaoController {
 
     private final EleicaoService eleicaoService;
 
-    // === OPERAÇÕES BÁSICAS ===
-
-    @GetMapping
-    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
-    @Operation(summary = "Listar eleições", description = "Lista todas as eleições com filtros opcionais")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Lista de eleições retornada com sucesso"),
-            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
-            @ApiResponse(responseCode = "403", description = "Acesso negado")
-    })
-    public ResponseEntity<Page<EleicaoListResponse>> getAllEleicoes(
-            @Parameter(description = "Filtro por nome") @RequestParam(required = false) String nome,
-            @Parameter(description = "Filtro por status ativo") @RequestParam(required = false) Boolean ativa,
-            @Parameter(description = "Filtro por status (aberta, encerrada, futura)") @RequestParam(required = false) String status,
-            @Parameter(description = "Número da página") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Tamanho da página") @RequestParam(defaultValue = "20") int size,
-            @Parameter(description = "Campo para ordenação") @RequestParam(defaultValue = "dataInicio") String sort,
-            @Parameter(description = "Direção da ordenação") @RequestParam(defaultValue = "desc") String direction
-    ) {
-        EleicaoFilterRequest filter = EleicaoFilterRequest.builder()
-                .nome(nome)
-                .ativa(ativa)
-                .status(status)
-                .page(page)
-                .size(size)
-                .sort(sort)
-                .direction(direction)
-                .build();
-
-        Page<EleicaoListResponse> eleicoes = eleicaoService.getAllEleicoes(filter);
-        return ResponseEntity.ok(eleicoes);
-    }
-
     @PostMapping
     @PreAuthorize("hasRole('ADMINISTRADOR')")
-    @Operation(summary = "Criar eleição", description = "Cria uma nova eleição")
+    @Operation(summary = "Criar eleição",
+            description = "Cria uma nova eleição no sistema. A eleição é criada inativa e deve ser ativada após configuração dos candidatos.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Eleição criada com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Dados de entrada inválidos"),
+            @ApiResponse(responseCode = "400", description = "Dados de entrada inválidos ou conflito de período"),
             @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
             @ApiResponse(responseCode = "403", description = "Acesso negado")
     })
@@ -80,7 +48,8 @@ public class EleicaoController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO', 'MEMBRO')")
-    @Operation(summary = "Buscar eleição por ID", description = "Retorna os dados de uma eleição específica")
+    @Operation(summary = "Buscar eleição por ID",
+            description = "Retorna os dados completos de uma eleição específica, incluindo candidatos e cargos com candidatos")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Eleição encontrada"),
             @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
@@ -92,12 +61,49 @@ public class EleicaoController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
+    @Operation(summary = "Listar eleições",
+            description = "Lista todas as eleições com filtros opcionais. Suporte a paginação e ordenação.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista de eleições retornada com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<Page<EleicaoListResponse>> getAllEleicoes(
+            @Parameter(description = "Filtro por nome") @RequestParam(required = false) String nome,
+            @Parameter(description = "Filtro por status ativo") @RequestParam(required = false) Boolean ativa,
+            @Parameter(description = "Filtro por status (aberta, encerrada, futura)") @RequestParam(required = false) String status,
+            @Parameter(description = "Filtro por eleições com candidatos") @RequestParam(required = false) Boolean temCandidatos,
+            @Parameter(description = "Filtro por eleições com candidatos aprovados") @RequestParam(required = false) Boolean temCandidatosAprovados,
+            @Parameter(description = "Número da página") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Tamanho da página") @RequestParam(defaultValue = "20") int size,
+            @Parameter(description = "Campo para ordenação") @RequestParam(defaultValue = "dataInicio") String sort,
+            @Parameter(description = "Direção da ordenação") @RequestParam(defaultValue = "desc") String direction
+    ) {
+        EleicaoFilterRequest filter = EleicaoFilterRequest.builder()
+                .nome(nome)
+                .ativa(ativa)
+                .status(status)
+                .temCandidatos(temCandidatos)
+                .temCandidatosAprovados(temCandidatosAprovados)
+                .page(page)
+                .size(size)
+                .sort(sort)
+                .direction(direction)
+                .build();
+
+        Page<EleicaoListResponse> eleicoes = eleicaoService.getAllEleicoes(filter);
+        return ResponseEntity.ok(eleicoes);
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
-    @Operation(summary = "Atualizar eleição", description = "Atualiza os dados de uma eleição")
+    @Operation(summary = "Atualizar eleição",
+            description = "Atualiza os dados de uma eleição. Não é possível atualizar eleição com votação em andamento.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Eleição atualizada com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Dados de entrada inválidos"),
+            @ApiResponse(responseCode = "400", description = "Dados de entrada inválidos ou conflito de estado"),
             @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
             @ApiResponse(responseCode = "403", description = "Acesso negado"),
             @ApiResponse(responseCode = "404", description = "Eleição não encontrada")
@@ -111,7 +117,8 @@ public class EleicaoController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
-    @Operation(summary = "Remover eleição", description = "Remove uma eleição do sistema")
+    @Operation(summary = "Remover eleição",
+            description = "Remove uma eleição do sistema. Não é possível remover eleição com votação em andamento ou que já possua votos.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Eleição removida com sucesso"),
             @ApiResponse(responseCode = "400", description = "Eleição não pode ser removida"),
@@ -124,14 +131,13 @@ public class EleicaoController {
         return ResponseEntity.noContent().build();
     }
 
-    // === OPERAÇÕES DE CONTROLE ===
-
     @PostMapping("/{id}/ativar")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
-    @Operation(summary = "Ativar eleição", description = "Ativa uma eleição para votação")
+    @Operation(summary = "Ativar eleição",
+            description = "Ativa uma eleição para votação. Valida se há candidatos aprovados e se não há conflito com outras eleições ativas.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Eleição ativada com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Eleição não pode ser ativada"),
+            @ApiResponse(responseCode = "400", description = "Eleição não pode ser ativada - verificar validações"),
             @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
             @ApiResponse(responseCode = "403", description = "Acesso negado"),
             @ApiResponse(responseCode = "404", description = "Eleição não encontrada")
@@ -157,7 +163,8 @@ public class EleicaoController {
 
     @PostMapping("/{id}/encerrar")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
-    @Operation(summary = "Encerrar eleição", description = "Encerra uma eleição permanentemente")
+    @Operation(summary = "Encerrar eleição",
+            description = "Encerra uma eleição permanentemente, definindo a data de fim como agora")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Eleição encerrada com sucesso"),
             @ApiResponse(responseCode = "400", description = "Eleição não pode ser encerrada"),
@@ -170,11 +177,10 @@ public class EleicaoController {
         return ResponseEntity.ok().build();
     }
 
-    // === CONSULTAS ESPECÍFICAS ===
-
     @GetMapping("/ativa")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO', 'MEMBRO')")
-    @Operation(summary = "Buscar eleição ativa", description = "Retorna a eleição atualmente ativa")
+    @Operation(summary = "Buscar eleição ativa",
+            description = "Retorna a eleição atualmente ativa com candidatos aprovados")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Eleição ativa encontrada"),
             @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
@@ -187,7 +193,8 @@ public class EleicaoController {
 
     @GetMapping("/abertas")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO', 'MEMBRO')")
-    @Operation(summary = "Eleições abertas", description = "Lista eleições com votação em andamento")
+    @Operation(summary = "Eleições abertas",
+            description = "Lista eleições com votação em andamento (ativas e dentro do período)")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso"),
             @ApiResponse(responseCode = "401", description = "Token inválido ou expirado")
@@ -199,7 +206,8 @@ public class EleicaoController {
 
     @GetMapping("/encerradas")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
-    @Operation(summary = "Eleições encerradas", description = "Lista eleições já finalizadas")
+    @Operation(summary = "Eleições encerradas",
+            description = "Lista eleições já finalizadas")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso"),
             @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
@@ -212,7 +220,8 @@ public class EleicaoController {
 
     @GetMapping("/futuras")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
-    @Operation(summary = "Eleições futuras", description = "Lista eleições agendadas para o futuro")
+    @Operation(summary = "Eleições futuras",
+            description = "Lista eleições agendadas para o futuro")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso"),
             @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
@@ -225,7 +234,8 @@ public class EleicaoController {
 
     @GetMapping("/recentes")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
-    @Operation(summary = "Eleições recentes", description = "Lista eleições mais recentes")
+    @Operation(summary = "Eleições recentes",
+            description = "Lista eleições mais recentes criadas no sistema")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso"),
             @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
@@ -237,11 +247,41 @@ public class EleicaoController {
         return ResponseEntity.ok(eleicoes);
     }
 
+    @GetMapping("/com-candidatos")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
+    @Operation(summary = "Eleições com candidatos aprovados",
+            description = "Lista eleições que possuem pelo menos um candidato aprovado")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<List<EleicaoListResponse>> getEleicoesComCandidatos() {
+        List<EleicaoListResponse> eleicoes = eleicaoService.getEleicoesComCandidatosAprovados();
+        return ResponseEntity.ok(eleicoes);
+    }
+
     // === VALIDAÇÕES ===
+
+    @GetMapping("/{id}/validacao")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @Operation(summary = "Validar eleição para ativação",
+            description = "Retorna validação completa se uma eleição pode ser ativada, incluindo motivos de impedimento")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Validação realizada"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado"),
+            @ApiResponse(responseCode = "404", description = "Eleição não encontrada")
+    })
+    public ResponseEntity<EleicaoValidacaoResponse> validarEleicao(@PathVariable UUID id) {
+        EleicaoValidacaoResponse validacao = eleicaoService.validarEleicaoParaAtivacao(id);
+        return ResponseEntity.ok(validacao);
+    }
 
     @GetMapping("/{id}/can-activate")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
-    @Operation(summary = "Verificar se pode ativar", description = "Verifica se uma eleição pode ser ativada")
+    @Operation(summary = "Verificar se pode ativar",
+            description = "Verifica rapidamente se uma eleição pode ser ativada (resposta booleana)")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Verificação realizada"),
             @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
@@ -255,7 +295,8 @@ public class EleicaoController {
 
     @GetMapping("/{id}/is-open")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO', 'MEMBRO')")
-    @Operation(summary = "Verificar se está aberta", description = "Verifica se uma eleição está aberta para votação")
+    @Operation(summary = "Verificar se está aberta",
+            description = "Verifica se uma eleição está aberta para votação no momento atual")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Verificação realizada"),
             @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
@@ -266,11 +307,30 @@ public class EleicaoController {
         return ResponseEntity.ok(isOpen);
     }
 
-    // === ESTATÍSTICAS ===
+    // === CONFIGURAÇÕES ===
+
+    @PutMapping("/{id}/configuracoes")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @Operation(summary = "Atualizar configurações",
+            description = "Atualiza apenas as configurações específicas da eleição (votos, elegíveis, etc.)")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Configurações atualizadas com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos ou eleição em votação"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado"),
+            @ApiResponse(responseCode = "404", description = "Eleição não encontrada")
+    })
+    public ResponseEntity<EleicaoResponse> updateConfiguracoes(
+            @PathVariable UUID id,
+            @Valid @RequestBody EleicaoConfigRequest request) {
+        EleicaoResponse response = eleicaoService.updateConfiguracoes(id, request);
+        return ResponseEntity.ok(response);
+    }
 
     @GetMapping("/stats/total")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
-    @Operation(summary = "Total de eleições", description = "Retorna o total de eleições cadastradas")
+    @Operation(summary = "Total de eleições",
+            description = "Retorna o total de eleições cadastradas no sistema")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Total retornado com sucesso"),
             @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
@@ -283,7 +343,8 @@ public class EleicaoController {
 
     @GetMapping("/stats/ativas")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
-    @Operation(summary = "Total de eleições ativas", description = "Retorna o total de eleições ativas")
+    @Operation(summary = "Total de eleições ativas",
+            description = "Retorna o total de eleições atualmente ativas")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Total retornado com sucesso"),
             @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
@@ -296,7 +357,8 @@ public class EleicaoController {
 
     @GetMapping("/stats/encerradas")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
-    @Operation(summary = "Total de eleições encerradas", description = "Retorna o total de eleições encerradas")
+    @Operation(summary = "Total de eleições encerradas",
+            description = "Retorna o total de eleições já finalizadas")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Total retornado com sucesso"),
             @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
@@ -309,7 +371,8 @@ public class EleicaoController {
 
     @GetMapping("/stats/futuras")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
-    @Operation(summary = "Total de eleições futuras", description = "Retorna o total de eleições futuras")
+    @Operation(summary = "Total de eleições futuras",
+            description = "Retorna o total de eleições agendadas para o futuro")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Total retornado com sucesso"),
             @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
@@ -320,10 +383,44 @@ public class EleicaoController {
         return ResponseEntity.ok(total);
     }
 
+    @GetMapping("/{id}/stats")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
+    @Operation(summary = "Estatísticas detalhadas da eleição",
+            description = "Retorna estatísticas completas de uma eleição específica")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Estatísticas retornadas com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado"),
+            @ApiResponse(responseCode = "404", description = "Eleição não encontrada")
+    })
+    public ResponseEntity<EleicaoStatsResponse> getEstatisticasEleicao(@PathVariable UUID id) {
+        EleicaoStatsResponse stats = eleicaoService.getEstatisticasEleicao(id);
+        return ResponseEntity.ok(stats);
+    }
+
+    // === CONSULTAS AVANÇADAS ===
+
+    @PostMapping("/buscar")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
+    @Operation(summary = "Busca avançada",
+            description = "Busca eleições com filtros avançados")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Busca realizada com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<List<EleicaoListResponse>> buscarEleicoes(
+            @Valid @RequestBody EleicaoFilterRequest filter) {
+        List<EleicaoListResponse> eleicoes = eleicaoService.buscarEleicoesComFiltros(filter);
+        return ResponseEntity.ok(eleicoes);
+    }
+
     // === EXCEPTION HANDLERS ===
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException e, HttpServletRequest request) {
+        log.warn("Argumento inválido na requisição: {} - {}", request.getRequestURI(), e.getMessage());
+
         ErrorResponse error = ErrorResponse.builder()
                 .code("INVALID_REQUEST")
                 .message(e.getMessage())
@@ -335,6 +432,8 @@ public class EleicaoController {
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ErrorResponse> handleIllegalState(IllegalStateException e, HttpServletRequest request) {
+        log.warn("Estado inválido na requisição: {} - {}", request.getRequestURI(), e.getMessage());
+
         ErrorResponse error = ErrorResponse.builder()
                 .code("INVALID_STATE")
                 .message(e.getMessage())
@@ -346,6 +445,8 @@ public class EleicaoController {
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ErrorResponse> handleRuntimeException(RuntimeException e, HttpServletRequest request) {
+        log.error("Erro interno na requisição: {} - {}", request.getRequestURI(), e.getMessage(), e);
+
         ErrorResponse error = ErrorResponse.builder()
                 .code("INTERNAL_ERROR")
                 .message("Erro interno do servidor")
@@ -355,7 +456,8 @@ public class EleicaoController {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
     }
 
-    // ErrorResponse DTO interno
+    // === ERROR RESPONSE DTO ===
+
     @lombok.Data
     @lombok.Builder
     @lombok.NoArgsConstructor

@@ -14,7 +14,6 @@ import java.util.List;
 )
 public interface UserMapper {
 
-    // === CREATE MAPPING ===
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
@@ -25,24 +24,21 @@ public interface UserMapper {
     @Mapping(target = "membro", ignore = true)
     User toEntity(CreateUserRequest request);
 
-    // === RESPONSE MAPPINGS ===
     @Mapping(target = "formattedRole", expression = "java(user.getFormattedRole())")
     @Mapping(target = "membro", source = "membro", qualifiedByName = "mapMembroToBasicInfo")
     UserResponse toResponse(User user);
 
     List<UserResponse> toResponseList(List<User> users);
 
-    // === USER PROFILE RESPONSE (para compatibilidade com auth existente) ===
     @Mapping(target = "id", source = "id")
     @Mapping(target = "email", source = "email")
     @Mapping(target = "role", source = "role")
     @Mapping(target = "nome", source = "membro.nome")
-    @Mapping(target = "fotoBase64", expression = "java(user.getMembro() != null ? user.getMembro().getFotoBase64() : null)")  // ✅ Mudou
-    @Mapping(target = "cargo", source = "membro.cargo")
+    @Mapping(target = "fotoBase64", expression = "java(user.getMembro() != null ? user.getMembro().getFotoBase64() : null)")
+    @Mapping(target = "cargo", expression = "java(user.getMembro() != null ? user.getMembro().getNomeCargoAtual() : null)")
     @Mapping(target = "dataNascimento", source = "membro.dataNascimento")
     UserProfileResponse toUserProfileResponse(User user);
 
-    // === NAMED MAPPINGS ===
     @Named("mapMembroToBasicInfo")
     default MembroBasicInfo mapMembroToBasicInfo(Membro membro) {
         if (membro == null) {
@@ -52,12 +48,11 @@ public interface UserMapper {
                 .id(membro.getId())
                 .nome(membro.getNome())
                 .fotoBase64(membro.getFotoBase64())
-                .cargo(membro.getCargo())
+                .cargo(membro.getNomeCargoAtual())
                 .ativo(membro.getAtivo())
                 .build();
     }
 
-    // === POST-MAPPING CUSTOMIZATIONS ===
     @AfterMapping
     default void setDefaults(@MappingTarget User user) {
         if (user.getAtivo() == null) {

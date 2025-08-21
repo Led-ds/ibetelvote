@@ -3,6 +3,7 @@ package com.br.ibetelvote.domain.services;
 import com.br.ibetelvote.application.eleicao.dto.*;
 import org.springframework.data.domain.Page;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,10 +31,20 @@ public interface EleicaoService {
     // === VALIDAÇÕES ===
     boolean canActivateEleicao(UUID id);
     boolean isEleicaoAberta(UUID id);
+    EleicaoValidacaoResponse validarEleicaoParaAtivacao(UUID id);
+
+    // === CONFIGURAÇÕES ===
+    EleicaoResponse updateConfiguracoes(UUID id, EleicaoConfigRequest request);
 
     // === ESTATÍSTICAS ===
     long getTotalEleicoes();
     long getTotalEleicoesAtivas();
     long getTotalEleicoesEncerradas();
     long getTotalEleicoesFuturas();
+    EleicaoStatsResponse getEstatisticasEleicao(UUID id);
+
+    // === CONSULTAS AVANÇADAS ===
+    List<EleicaoListResponse> buscarEleicoesComFiltros(EleicaoFilterRequest filter);
+    List<EleicaoListResponse> getEleicoesComCandidatosAprovados();
+    boolean existeEleicaoAtivaNoMesmoPeriodo(LocalDateTime inicio, LocalDateTime fim, UUID excludeId);
 }

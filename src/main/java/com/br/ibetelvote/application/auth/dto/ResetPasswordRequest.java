@@ -11,19 +11,11 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ChangePasswordRequest {
-
-    @NotBlank(message = "Senha atual é obrigatória")
-    private String currentPassword;
+public class ResetPasswordRequest {
 
     @NotBlank(message = "Nova senha é obrigatória")
     @Size(min = 6, message = "Nova senha deve ter no mínimo 6 caracteres")
     private String newPassword;
 
-    @NotBlank(message = "Confirmação de senha é obrigatória")
-    private String confirmPassword;
-
-    public boolean isNewPasswordConfirmed() {
-        return newPassword != null && newPassword.equals(confirmPassword);
-    }
+    private String motivo;
 }

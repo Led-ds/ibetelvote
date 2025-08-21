@@ -15,5 +15,5 @@ public class ChangeRoleRequest {
     @NotNull(message = "Nova role é obrigatória")
     private UserRole newRole;
 
-    private String reason;
+    private String motivo;
 }

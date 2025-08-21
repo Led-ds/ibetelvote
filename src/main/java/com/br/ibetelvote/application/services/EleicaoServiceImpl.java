@@ -29,17 +29,23 @@ public class EleicaoServiceImpl implements EleicaoService {
     private final EleicaoJpaRepository eleicaoRepository;
     private final EleicaoMapper eleicaoMapper;
 
-    // === OPERAÇÕES BÁSICAS ===
-
     @Override
-    @CacheEvict(value = {"eleicoes", "eleicao-stats"}, allEntries = true)
+    @CacheEvict(value = {"eleicoes", "eleicao-stats", "eleicao-ativa"}, allEntries = true)
     public EleicaoResponse createEleicao(CreateEleicaoRequest request) {
         log.info("Criando nova eleição: {}", request.getNome());
 
         // Validar datas
         validarDatas(request.getDataInicio(), request.getDataFim());
 
+        // Verificar conflito de período com eleições ativas
+        if (existeEleicaoAtivaNoMesmoPeriodo(request.getDataInicio(), request.getDataFim(), null)) {
+            throw new IllegalArgumentException("Já existe uma eleição ativa no mesmo período");
+        }
+
         Eleicao eleicao = eleicaoMapper.toEntity(request);
+        eleicao.normalizarNome();
+        eleicao.validarDados();
+
         Eleicao savedEleicao = eleicaoRepository.save(eleicao);
 
         log.info("Eleição criada com sucesso - ID: {}, Nome: {}", savedEleicao.getId(), savedEleicao.getNome());
@@ -52,7 +58,7 @@ public class EleicaoServiceImpl implements EleicaoService {
     public EleicaoResponse getEleicaoById(UUID id) {
         log.debug("Buscando eleição por ID: {}", id);
 
-        Eleicao eleicao = eleicaoRepository.findById(id)
+        Eleicao eleicao = eleicaoRepository.findByIdWithCandidatos(id)
                 .orElseThrow(() -> new IllegalArgumentException("Eleição não encontrada com ID: " + id));
 
         return eleicaoMapper.toResponse(eleicao);
@@ -64,39 +70,35 @@ public class EleicaoServiceImpl implements EleicaoService {
         log.debug("Listando eleições com filtros: {}", filter);
 
         Pageable pageable = createPageable(filter);
-
-        Page<Eleicao> eleicoesPage;
-
-        if (hasFilters(filter)) {
-            // Aplicar filtros específicos
-            if (filter.getNome() != null) {
-                eleicoesPage = eleicaoRepository.findByNomeContainingIgnoreCase(filter.getNome(), pageable);
-            } else {
-                eleicoesPage = eleicaoRepository.findAll(pageable);
-            }
-        } else {
-            eleicoesPage = eleicaoRepository.findAll(pageable);
-        }
+        Page<Eleicao> eleicoesPage = aplicarFiltros(filter, pageable);
 
         return eleicoesPage.map(eleicaoMapper::toListResponse);
     }
 
     @Override
-    @CacheEvict(value = {"eleicoes", "eleicao-stats"}, allEntries = true)
+    @CacheEvict(value = {"eleicoes", "eleicao-stats", "eleicao-ativa"}, allEntries = true)
     public EleicaoResponse updateEleicao(UUID id, UpdateEleicaoRequest request) {
         log.info("Atualizando eleição ID: {}", id);
 
         Eleicao eleicao = eleicaoRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Eleição não encontrada com ID: " + id));
 
-        // Validar se pode ser atualizada
+
         if (eleicao.isVotacaoAberta()) {
             throw new IllegalStateException("Não é possível atualizar eleição com votação em andamento");
         }
 
         // Validar datas se foram fornecidas
-        if (request.getDataInicio() != null && request.getDataFim() != null) {
-            validarDatas(request.getDataInicio(), request.getDataFim());
+        LocalDateTime novaDataInicio = request.getDataInicio() != null ? request.getDataInicio() : eleicao.getDataInicio();
+        LocalDateTime novaDataFim = request.getDataFim() != null ? request.getDataFim() : eleicao.getDataFim();
+
+        if (request.getDataInicio() != null || request.getDataFim() != null) {
+            validarDatas(novaDataInicio, novaDataFim);
+
+            // Verificar conflito com outras eleições ativas
+            if (existeEleicaoAtivaNoMesmoPeriodo(novaDataInicio, novaDataFim, id)) {
+                throw new IllegalArgumentException("Já existe uma eleição ativa no período informado");
+            }
         }
 
         eleicaoMapper.updateEntityFromRequest(request, eleicao);
@@ -107,14 +109,13 @@ public class EleicaoServiceImpl implements EleicaoService {
     }
 
     @Override
-    @CacheEvict(value = {"eleicoes", "eleicao-stats"}, allEntries = true)
+    @CacheEvict(value = {"eleicoes", "eleicao-stats", "eleicao-ativa"}, allEntries = true)
     public void deleteEleicao(UUID id) {
         log.info("Removendo eleição ID: {}", id);
 
-        Eleicao eleicao = eleicaoRepository.findById(id)
+        Eleicao eleicao = eleicaoRepository.findByIdWithCandidatosAndVotos(id)
                 .orElseThrow(() -> new IllegalArgumentException("Eleição não encontrada com ID: " + id));
 
-        // Validar se pode ser removida
         if (eleicao.isVotacaoAberta()) {
             throw new IllegalStateException("Não é possível remover eleição com votação em andamento");
         }
@@ -127,31 +128,34 @@ public class EleicaoServiceImpl implements EleicaoService {
         log.info("Eleição removida com sucesso - ID: {}", id);
     }
 
-    // === OPERAÇÕES DE CONTROLE ===
-
     @Override
-    @CacheEvict(value = {"eleicoes", "eleicao-stats"}, allEntries = true)
+    @CacheEvict(value = {"eleicoes", "eleicao-stats", "eleicao-ativa"}, allEntries = true)
     public void ativarEleicao(UUID id) {
         log.info("Ativando eleição ID: {}", id);
 
-        Eleicao eleicao = eleicaoRepository.findById(id)
+        Eleicao eleicao = eleicaoRepository.findByIdWithCandidatos(id)
                 .orElseThrow(() -> new IllegalArgumentException("Eleição não encontrada com ID: " + id));
 
-        // Verificar se existe outra eleição ativa
-        eleicaoRepository.findEleicaoAtiva().ifPresent(eleicaoAtiva -> {
+        eleicaoRepository.findEleicaoAtivaComCandidatos().ifPresent(eleicaoAtiva -> {
             if (!eleicaoAtiva.getId().equals(id)) {
-                throw new IllegalStateException("Já existe uma eleição ativa. Desative-a antes de ativar outra.");
+                throw new IllegalStateException("Já existe uma eleição ativa com candidatos. Desative-a antes de ativar outra.");
             }
         });
 
-        eleicao.activate(); // Valida automaticamente se pode ser ativada
+        // Verificar conflito de período
+        if (existeEleicaoAtivaNoMesmoPeriodo(eleicao.getDataInicio(), eleicao.getDataFim(), id)) {
+            throw new IllegalStateException("Há conflito de período com outra eleição ativa");
+        }
+
+        eleicao.activate();
         eleicaoRepository.save(eleicao);
 
-        log.info("Eleição ativada com sucesso - ID: {}", id);
+        log.info("Eleição ativada com sucesso - ID: {}, Total candidatos aprovados: {}",
+                id, eleicao.getTotalCandidatosAprovados());
     }
 
     @Override
-    @CacheEvict(value = {"eleicoes", "eleicao-stats"}, allEntries = true)
+    @CacheEvict(value = {"eleicoes", "eleicao-stats", "eleicao-ativa"}, allEntries = true)
     public void desativarEleicao(UUID id) {
         log.info("Desativando eleição ID: {}", id);
 
@@ -165,7 +169,7 @@ public class EleicaoServiceImpl implements EleicaoService {
     }
 
     @Override
-    @CacheEvict(value = {"eleicoes", "eleicao-stats"}, allEntries = true)
+    @CacheEvict(value = {"eleicoes", "eleicao-stats", "eleicao-ativa"}, allEntries = true)
     public void encerrarEleicao(UUID id) {
         log.info("Encerrando eleição ID: {}", id);
 
@@ -182,15 +186,13 @@ public class EleicaoServiceImpl implements EleicaoService {
         log.info("Eleição encerrada com sucesso - ID: {}", id);
     }
 
-    // === CONSULTAS ESPECÍFICAS ===
-
     @Override
     @Cacheable(value = "eleicao-ativa")
     @Transactional(readOnly = true)
     public EleicaoResponse getEleicaoAtiva() {
         log.debug("Buscando eleição ativa");
 
-        Eleicao eleicao = eleicaoRepository.findEleicaoAtiva()
+        Eleicao eleicao = eleicaoRepository.findEleicaoAtivaComCandidatos()
                 .orElseThrow(() -> new IllegalArgumentException("Nenhuma eleição ativa encontrada"));
 
         return eleicaoMapper.toResponse(eleicao);
@@ -202,7 +204,7 @@ public class EleicaoServiceImpl implements EleicaoService {
     public List<EleicaoListResponse> getEleicoesAbertas() {
         log.debug("Buscando eleições abertas");
 
-        List<Eleicao> eleicoes = eleicaoRepository.findEleicoesAbertas();
+        List<Eleicao> eleicoes = eleicaoRepository.findEleicoesAbertasComCandidatos();
         return eleicaoMapper.toListResponseList(eleicoes);
     }
 
@@ -235,12 +237,20 @@ public class EleicaoServiceImpl implements EleicaoService {
         return eleicaoMapper.toListResponseList(eleicoes);
     }
 
-    // === VALIDAÇÕES ===
+    @Override
+    @Transactional(readOnly = true)
+    public List<EleicaoListResponse> getEleicoesComCandidatosAprovados() {
+        log.debug("Buscando eleições com candidatos aprovados");
+
+        List<Eleicao> eleicoes = eleicaoRepository.findEleicoesComCandidatosAprovados();
+        return eleicaoMapper.toListResponseList(eleicoes);
+    }
+
 
     @Override
     @Transactional(readOnly = true)
     public boolean canActivateEleicao(UUID id) {
-        Eleicao eleicao = eleicaoRepository.findById(id)
+        Eleicao eleicao = eleicaoRepository.findByIdWithCandidatos(id)
                 .orElseThrow(() -> new IllegalArgumentException("Eleição não encontrada com ID: " + id));
 
         return eleicao.podeSerAtivada();
@@ -255,7 +265,49 @@ public class EleicaoServiceImpl implements EleicaoService {
         return eleicao.isVotacaoAberta();
     }
 
-    // === ESTATÍSTICAS ===
+    @Override
+    @Transactional(readOnly = true)
+    public EleicaoValidacaoResponse validarEleicaoParaAtivacao(UUID id) {
+        log.debug("Validando eleição para ativação - ID: {}", id);
+
+        Eleicao eleicao = eleicaoRepository.findByIdWithCandidatos(id)
+                .orElseThrow(() -> new IllegalArgumentException("Eleição não encontrada com ID: " + id));
+
+        return eleicaoMapper.toValidacaoResponse(eleicao);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existeEleicaoAtivaNoMesmoPeriodo(LocalDateTime inicio, LocalDateTime fim, UUID excludeId) {
+        return eleicaoRepository.existeEleicaoAtivaNoMesmoPeriodo(inicio, fim, excludeId);
+    }
+
+
+    @Override
+    @CacheEvict(value = {"eleicoes", "eleicao-stats"}, allEntries = true)
+    public EleicaoResponse updateConfiguracoes(UUID id, EleicaoConfigRequest request) {
+        log.info("Atualizando configurações da eleição ID: {}", id);
+
+        Eleicao eleicao = eleicaoRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Eleição não encontrada com ID: " + id));
+
+        if (eleicao.isVotacaoAberta()) {
+            throw new IllegalStateException("Não é possível alterar configurações durante a votação");
+        }
+
+        eleicao.updateConfiguracoes(
+                request.getPermiteVotoBranco(),
+                request.getPermiteVotoNulo(),
+                request.getExibeResultadosParciais(),
+                request.getTotalElegiveis()
+        );
+
+        Eleicao updatedEleicao = eleicaoRepository.save(eleicao);
+        log.info("Configurações atualizadas com sucesso - ID: {}", id);
+
+        return eleicaoMapper.toResponse(updatedEleicao);
+    }
+
 
     @Override
     @Cacheable(value = "eleicao-stats", key = "'total'")
@@ -285,7 +337,29 @@ public class EleicaoServiceImpl implements EleicaoService {
         return eleicaoRepository.countEleicoesFuturas();
     }
 
-    // === MÉTODOS AUXILIARES ===
+    @Override
+    @Cacheable(value = "eleicao-stats", key = "#id")
+    @Transactional(readOnly = true)
+    public EleicaoStatsResponse getEstatisticasEleicao(UUID id) {
+        log.debug("Buscando estatísticas da eleição ID: {}", id);
+
+        Eleicao eleicao = eleicaoRepository.findByIdWithCandidatosAndVotos(id)
+                .orElseThrow(() -> new IllegalArgumentException("Eleição não encontrada com ID: " + id));
+
+        return eleicaoMapper.toStatsResponse(eleicao);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EleicaoListResponse> buscarEleicoesComFiltros(EleicaoFilterRequest filter) {
+        log.debug("Buscando eleições com filtros avançados: {}", filter);
+
+        // Implementar busca avançada baseada nos filtros
+        Pageable pageable = createPageable(filter);
+        Page<Eleicao> eleicoes = aplicarFiltros(filter, pageable);
+
+        return eleicaoMapper.toListResponseList(eleicoes.getContent());
+    }
 
     private void validarDatas(LocalDateTime dataInicio, LocalDateTime dataFim) {
         if (dataInicio == null || dataFim == null) {
@@ -314,9 +388,23 @@ public class EleicaoServiceImpl implements EleicaoService {
         return PageRequest.of(filter.getPage(), filter.getSize(), sort);
     }
 
+    private Page<Eleicao> aplicarFiltros(EleicaoFilterRequest filter, Pageable pageable) {
+        if (hasFilters(filter)) {
+            if (filter.getNome() != null) {
+                return eleicaoRepository.findByNomeContainingIgnoreCase(filter.getNome(), pageable);
+            }
+            // Implementar outros filtros conforme necessário
+            return eleicaoRepository.findAll(pageable);
+        } else {
+            return eleicaoRepository.findAll(pageable);
+        }
+    }
+
     private boolean hasFilters(EleicaoFilterRequest filter) {
         return filter.getNome() != null ||
                 filter.getAtiva() != null ||
-                filter.getStatus() != null;
+                filter.getStatus() != null ||
+                filter.getTemCandidatos() != null ||
+                filter.getTemCandidatosAprovados() != null;
     }
 }

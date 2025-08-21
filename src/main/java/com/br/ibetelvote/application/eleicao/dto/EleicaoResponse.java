@@ -32,19 +32,27 @@ public class EleicaoResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    // Dados relacionados
-    private List<CargoBasicInfo> cargos;
     private List<CandidatoBasicInfo> candidatos;
+    private List<CargoBasicInfo> cargosComCandidatos; // Apenas cargos que têm candidatos aprovados
 
-    // Campos computados
+    // === CAMPOS COMPUTADOS ===
     private String statusDescricao;
     private double percentualParticipacao;
     private int totalVotosContabilizados;
     private long duracaoEmHoras;
+
+    // Status da votação
     private boolean votacaoAberta;
     private boolean votacaoEncerrada;
     private boolean votacaoFutura;
-    private boolean temCargos;
+
+    // Status dos candidatos
     private boolean temCandidatos;
+    private boolean temCandidatosAprovados;
+    private int totalCandidatosAprovados;
+
+    private int totalCargosComCandidatos;
+
+    // Validações
     private boolean podeSerAtivada;
 }

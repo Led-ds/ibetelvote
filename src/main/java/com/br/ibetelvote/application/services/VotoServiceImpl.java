@@ -406,7 +406,7 @@ public class VotoServiceImpl implements VotoService {
 
         List<Voto> votos = votoRepository.findVotosParaAuditoria(eleicaoId);
         return votos.stream()
-                .map(votoMapper::toAuditResponse) // Remove dados sensíveis
+                .map(votoMapper::toResponse) // Remove dados sensíveis
                 .collect(Collectors.toList());
     }
 

@@ -247,11 +247,13 @@ public interface VotoJpaRepository extends JpaRepository<Voto, UUID>, VotoReposi
     /**
      * Busca participação por cargo atual do membro
      */
-    @Query("SELECT m.nomeCargoAtual, COUNT(DISTINCT v.membroId) " +
-            "FROM Voto v JOIN Membro m ON v.membroId = m.id " +
+    @Query("SELECT COALESCE(c.nome, 'Sem Cargo'), COUNT(DISTINCT v.membroId) " +
+            "FROM Voto v " +
+            "JOIN Membro m ON v.membroId = m.id " +
+            "LEFT JOIN Cargo c ON m.cargoAtualId = c.id " +
             "WHERE v.eleicaoId = :eleicaoId " +
-            "GROUP BY m.cargoAtualId, m.nomeCargoAtual " +
-            "ORDER BY m.nomeCargoAtual")
+            "GROUP BY m.cargoAtualId, c.nome " +
+            "ORDER BY c.nome NULLS LAST")
     List<Object[]> getParticipacaoPorCargoMembro(@Param("eleicaoId") UUID eleicaoId);
 
     /**
@@ -289,9 +291,10 @@ public interface VotoJpaRepository extends JpaRepository<Voto, UUID>, VotoReposi
     /**
      * Busca votos registrados muito próximos no tempo (possível automação)
      */
-    @Query("SELECT v FROM Voto v WHERE v.eleicaoId = :eleicaoId AND " +
-            "EXISTS (SELECT v2 FROM Voto v2 WHERE v2.membroId = v.membroId AND v2.id != v.id AND " +
-            "ABS(TIMESTAMPDIFF(SECOND, v.dataVoto, v2.dataVoto)) <= :segundosIntervalo)")
+    @Query(value = "SELECT * FROM votos v WHERE v.eleicao_id = :eleicaoId AND " +
+            "EXISTS (SELECT 1 FROM votos v2 WHERE v2.membro_id = v.membro_id AND v2.id != v.id AND " +
+            "ABS(EXTRACT(EPOCH FROM (v.created_at - v2.created_at))) <= :segundosIntervalo)",
+            nativeQuery = true)
     List<Voto> findVotosSequenciaisRapidos(@Param("eleicaoId") UUID eleicaoId,
                                            @Param("segundosIntervalo") int segundosIntervalo);
 

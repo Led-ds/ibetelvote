@@ -26,6 +26,9 @@ public interface MembroJpaRepository extends JpaRepository<Membro, UUID>, Membro
     long countByAtivo(Boolean ativo);
 
     // === CONSULTAS POR DADOS PESSOAIS ===
+    @Query("SELECT m FROM Membro m WHERE m.email = :email AND m.cpf = :cpf")
+    Optional<Membro> findByEmailAndCpf(@Param("email") String email, @Param("cpf") String cpf);
+
     @Query("SELECT m FROM Membro m WHERE UPPER(m.email) = UPPER(:email)")
     Optional<Membro> findByEmail(@Param("email") String email);
 
