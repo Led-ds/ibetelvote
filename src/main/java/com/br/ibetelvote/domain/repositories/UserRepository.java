@@ -10,25 +10,27 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface UserRepository {
-    Optional<User> findByEmail(String email);
-    Page<User> findAll(Pageable pageable);
+
+    // === OPERAÇÕES BÁSICAS ===
     void deleteById(UUID id);
-    boolean existsById(UUID id);
-    boolean existsByEmail(String email);
-    boolean existsByEmailAndIdNot(String email, UUID id);
     long count();
 
-    // Consultas por Role
+    // === CONSULTAS POR EMAIL ===
+    Optional<User> findByEmail(String email);
+    boolean existsByEmail(String email);
+    boolean existsByEmailAndIdNot(String email, UUID id);
+    Optional<User> findActiveUserByEmail(String email);
+
+    // === CONSULTAS COM RELACIONAMENTOS ===
+    Optional<User> findByIdWithMembro(UUID id);
+
+    // === CONSULTAS POR ROLE ===
     Page<User> findByRole(UserRole role, Pageable pageable);
     List<User> findByRoleAndAtivoTrue(UserRole role);
     long countByRole(UserRole role);
     long countByRoleAndAtivoTrue(UserRole role);
 
-    // Consultas por Status
+    // === CONSULTAS POR STATUS ===
     Page<User> findByAtivoTrue(Pageable pageable);
     long countByAtivoTrue();
-
-    // Consultas específicas para autenticação
-    Optional<User> findActiveUserByEmail(String email);
-    Optional<User> findByIdWithMembro(UUID id);
 }

@@ -127,7 +127,10 @@ public class AutoCadastroServiceImpl implements AutoCadastroService {
                 .email(membro.getEmail())
                 .cpf(membro.getCpf())
                 .dataNascimento(membro.getDataNascimento())
-                .cargo(membro.getCargo())
+
+                .cargoAtualId(membro.getCargoAtualId())           // UUID do cargo atual
+                .nomeCargoAtual(membro.getNomeCargoAtual())       // Nome do cargo para exibição
+
                 .departamento(membro.getDepartamento())
                 .dataBatismo(membro.getDataBatismo())
                 .dataMembroDesde(membro.getDataMembroDesde())
@@ -144,8 +147,10 @@ public class AutoCadastroServiceImpl implements AutoCadastroService {
                 .observacoes(membro.getObservacoes())
                 .ativo(membro.getAtivo())
                 .hasUser(membro.hasUser())
-                .isBasicProfileComplete(membro.isBasicProfileComplete())
-                .isFullProfileComplete(membro.isFullProfileComplete())
+
+                .isBasicProfileComplete(isBasicProfileComplete(membro))
+                .isFullProfileComplete(isFullProfileComplete(membro))
+
                 .createdAt(membro.getCreatedAt())
                 .updatedAt(membro.getUpdatedAt())
                 .build();
@@ -171,22 +176,48 @@ public class AutoCadastroServiceImpl implements AutoCadastroService {
                 membro.getCpf() // CPF não pode ser alterado
         );
 
-        // Atualizar dados completos
-        membro.updateCompleteProfile(
-                request.getTelefone(),
-                request.getCelular(),
-                request.getEndereco(),
-                request.getCidade(),
-                request.getEstado(),
-                request.getCep(),
-                request.getCargo(),
-                request.getDepartamento(),
-                request.getDataBatismo(),
-                request.getDataMembroDesde()
-        );
+        // Atualizar dados de contato
+        if (request.getTelefone() != null) {
+            membro.setTelefone(request.getTelefone());
+        }
+        if (request.getCelular() != null) {
+            membro.setCelular(request.getCelular());
+        }
+
+        // Atualizar endereço
+        if (request.getEndereco() != null) {
+            membro.setEndereco(request.getEndereco());
+        }
+        if (request.getCidade() != null) {
+            membro.setCidade(request.getCidade());
+        }
+        if (request.getEstado() != null) {
+            membro.setEstado(request.getEstado());
+        }
+        if (request.getCep() != null) {
+            membro.setCep(request.getCep());
+        }
+
+        // Atualizar cargo (se existir no DTO)
+        if (request.getCargoAtualId() != null) {
+            membro.setCargoAtualId(request.getCargoAtualId());
+        }
+
+        // Atualizar dados da igreja
+        if (request.getDepartamento() != null) {
+            membro.setDepartamento(request.getDepartamento());
+        }
+        if (request.getDataBatismo() != null) {
+            membro.setDataBatismo(request.getDataBatismo());
+        }
+        if (request.getDataMembroDesde() != null) {
+            membro.setDataMembroDesde(request.getDataMembroDesde());
+        }
 
         // Atualizar observações
-        membro.updateObservations(request.getObservacoes());
+        if (request.getObservacoes() != null) {
+            membro.setObservacoes(request.getObservacoes());
+        }
 
         Membro savedMembro = membroRepository.save(membro);
 
@@ -201,6 +232,22 @@ public class AutoCadastroServiceImpl implements AutoCadastroService {
         return membroRepository.findByEmailAndCpf(email, cpf)
                 .map(Membro::canCreateUser)
                 .orElse(false);
+    }
+
+    private boolean isBasicProfileComplete(Membro membro) {
+        return membro.getNome() != null && !membro.getNome().trim().isEmpty() &&
+                membro.getEmail() != null && !membro.getEmail().trim().isEmpty() &&
+                membro.getCpf() != null && !membro.getCpf().trim().isEmpty() &&
+                membro.getTelefone() != null && !membro.getTelefone().trim().isEmpty();
+    }
+
+    private boolean isFullProfileComplete(Membro membro) {
+        return isBasicProfileComplete(membro) &&
+                membro.getDataNascimento() != null &&
+                membro.getEndereco() != null && !membro.getEndereco().trim().isEmpty() &&
+                membro.getCidade() != null && !membro.getCidade().trim().isEmpty() &&
+                membro.getEstado() != null && !membro.getEstado().trim().isEmpty() &&
+                membro.getCep() != null && !membro.getCep().trim().isEmpty();
     }
 
 }

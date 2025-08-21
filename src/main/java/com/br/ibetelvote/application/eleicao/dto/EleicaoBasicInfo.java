@@ -20,4 +20,6 @@ public class EleicaoBasicInfo {
     private LocalDateTime dataInicio;
     private LocalDateTime dataFim;
     private String statusDescricao;
+    private boolean votacaoAberta;
+    private boolean temCandidatosAprovados;
 }

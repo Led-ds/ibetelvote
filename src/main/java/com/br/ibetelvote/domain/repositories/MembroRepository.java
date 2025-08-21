@@ -12,7 +12,6 @@ public interface MembroRepository {
 
     // === OPERAÇÕES BÁSICAS ===
     void deleteById(UUID id);
-    boolean existsById(UUID id);
     long count();
 
     // === CONSULTAS POR STATUS ===

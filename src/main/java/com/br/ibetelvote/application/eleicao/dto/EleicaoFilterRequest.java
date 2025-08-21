@@ -14,6 +14,8 @@ public class EleicaoFilterRequest {
     private String nome;
     private Boolean ativa;
     private String status; // "aberta", "encerrada", "futura"
+    private Boolean temCandidatos;
+    private Boolean temCandidatosAprovados;
     private int page = 0;
     private int size = 20;
     private String sort = "dataInicio";

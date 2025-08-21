@@ -19,7 +19,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -37,18 +36,22 @@ public class UserServiceImpl implements UserService {
     @Override
     @CacheEvict(value = {"users", "user-stats"}, allEntries = true)
     public UserResponse createUser(CreateUserRequest request) {
-        log.info("Criando novo usuário com email: {}", request.getEmail());
+        log.info("Criando novo usuário: {}", request.getEmail());
 
-        // Verificar se email já existe
+        // Validar se email já existe
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new IllegalArgumentException("Email já cadastrado: " + request.getEmail());
         }
 
+        // Criar entidade user
         User user = userMapper.toEntity(request);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
+
         User savedUser = userRepository.save(user);
 
-        log.info("Usuário criado com sucesso - ID: {}, Role: {}", savedUser.getId(), savedUser.getRole());
+        log.info("Usuário criado com sucesso - ID: {}, Email: {}, Role: {}",
+                savedUser.getId(), savedUser.getEmail(), savedUser.getRole());
+
         return userMapper.toResponse(savedUser);
     }
 
@@ -58,18 +61,13 @@ public class UserServiceImpl implements UserService {
     public UserResponse getUserById(UUID id) {
         log.debug("Buscando usuário por ID: {}", id);
 
-        if (!userRepository.existsById(id)) {
-            throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
-        }
-
-        Optional<User> userOpt = userRepository.findById(id);
-        User user = userOpt.orElse(null);
+        User user = userRepository.findByIdWithMembro(id)
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado com ID: " + id));
 
         return userMapper.toResponse(user);
     }
 
     @Override
-    @Cacheable(value = "users", key = "#email")
     @Transactional(readOnly = true)
     public UserResponse getUserByEmail(String email) {
         log.debug("Buscando usuário por email: {}", email);
@@ -85,14 +83,10 @@ public class UserServiceImpl implements UserService {
     public Page<UserResponse> getAllUsers(int page, int size, String sort, String direction) {
         log.debug("Listando usuários - página: {}, tamanho: {}", page, size);
 
-        Sort sortObj = Sort.by(
-                "desc".equalsIgnoreCase(direction) ? Sort.Direction.DESC : Sort.Direction.ASC,
-                sort
-        );
-        Pageable pageable = PageRequest.of(page, size, sortObj);
+        Pageable pageable = createPageable(page, size, sort, direction);
+        Page<User> users = userRepository.findAll(pageable);
 
-        Page<User> usersPage = userRepository.findAll(pageable);
-        return usersPage.map(userMapper::toResponse);
+        return users.map(userMapper::toResponse);
     }
 
     @Override
@@ -100,30 +94,25 @@ public class UserServiceImpl implements UserService {
     public void deleteUser(UUID id) {
         log.info("Removendo usuário ID: {}", id);
 
-        if (!userRepository.existsById(id)) {
-            throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
-        }
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado com ID: " + id));
 
-        Optional<User> userOpt = userRepository.findById(id);
-        User user = userOpt.orElse(null);
+        // Validar se pode ser removido (regras de negócio)
+        if (user.hasMembro()) {
+            throw new IllegalStateException("Não é possível remover usuário que possui membro associado");
+        }
 
         userRepository.delete(user);
         log.info("Usuário removido com sucesso - ID: {}", id);
     }
-
-    // === OPERAÇÕES DE CONTROLE DE CONTA ===
 
     @Override
     @CacheEvict(value = {"users", "user-stats"}, allEntries = true)
     public void activateUser(UUID id) {
         log.info("Ativando usuário ID: {}", id);
 
-        if (!userRepository.existsById(id)) {
-            throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
-        }
-
-        Optional<User> userOpt = userRepository.findById(id);
-        User user = userOpt.orElse(null);
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado com ID: " + id));
 
         user.activate();
         userRepository.save(user);
@@ -136,12 +125,8 @@ public class UserServiceImpl implements UserService {
     public void deactivateUser(UUID id) {
         log.info("Desativando usuário ID: {}", id);
 
-        if (!userRepository.existsById(id)) {
-            throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
-        }
-
-        Optional<User> userOpt = userRepository.findById(id);
-        User user = userOpt.orElse(null);
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado com ID: " + id));
 
         user.deactivate();
         userRepository.save(user);
@@ -150,16 +135,12 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    @CacheEvict(value = "users", key = "#id")
+    @CacheEvict(value = {"users", "user-stats"}, allEntries = true)
     public void lockUser(UUID id) {
         log.info("Bloqueando usuário ID: {}", id);
 
-        if (!userRepository.existsById(id)) {
-            throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
-        }
-
-        Optional<User> userOpt = userRepository.findById(id);
-        User user = userOpt.orElse(null);
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado com ID: " + id));
 
         user.lockAccount();
         userRepository.save(user);
@@ -168,16 +149,12 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    @CacheEvict(value = "users", key = "#id")
+    @CacheEvict(value = {"users", "user-stats"}, allEntries = true)
     public void unlockUser(UUID id) {
         log.info("Desbloqueando usuário ID: {}", id);
 
-        if (!userRepository.existsById(id)) {
-            throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
-        }
-
-        Optional<User> userOpt = userRepository.findById(id);
-        User user = userOpt.orElse(null);
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado com ID: " + id));
 
         user.unlockAccount();
         userRepository.save(user);
@@ -185,62 +162,50 @@ public class UserServiceImpl implements UserService {
         log.info("Usuário desbloqueado com sucesso - ID: {}", id);
     }
 
-    // === OPERAÇÕES DE ROLE ===
-
     @Override
     @CacheEvict(value = {"users", "user-stats"}, allEntries = true)
     public void changeUserRole(UUID id, ChangeRoleRequest request) {
-        log.info("Alterando role do usuário ID: {} para: {}", id, request.getNewRole());
+        log.info("Alterando role do usuário ID: {} para {}", id, request.getNewRole());
 
-        if (!userRepository.existsById(id)) {
-            throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
-        }
-
-        Optional<User> userOpt = userRepository.findById(id);
-        User user = userOpt.orElse(null);
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado com ID: " + id));
 
         UserRole oldRole = user.getRole();
         user.changeRole(request.getNewRole());
         userRepository.save(user);
 
-        log.info("Role alterada com sucesso - ID: {}, De: {} Para: {}, Motivo: {}",
-                id, oldRole, request.getNewRole(), request.getReason());
+        log.info("Role alterada com sucesso - ID: {}, De: {} Para: {}",
+                id, oldRole, request.getNewRole());
     }
 
     @Override
-    @Cacheable(value = "users-by-role", key = "#role")
     @Transactional(readOnly = true)
     public List<UserResponse> getUsersByRole(UserRole role) {
-        log.debug("Buscando usuários por role: {}", role);
+        log.debug("Buscando usuários ativos por role: {}", role);
 
         List<User> users = userRepository.findByRoleAndAtivoTrue(role);
         return userMapper.toResponseList(users);
     }
-
-    // === OPERAÇÕES DE SENHA ===
 
     @Override
     @CacheEvict(value = "users", key = "#id")
     public void changePassword(UUID id, ChangePasswordRequest request) {
         log.info("Alterando senha do usuário ID: {}", id);
 
-        // Validar se senhas coincidem
-        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
-            throw new IllegalArgumentException("Nova senha e confirmação não coincidem");
+        // Validar confirmação de senha
+        if (!request.isNewPasswordConfirmed()) {
+            throw new IllegalArgumentException("Confirmação de senha não confere");
         }
 
-        if (!userRepository.existsById(id)) {
-            throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
-        }
-
-        Optional<User> userOpt = userRepository.findById(id);
-        User user = userOpt.orElse(null);
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado com ID: " + id));
 
         // Validar senha atual
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
             throw new IllegalArgumentException("Senha atual incorreta");
         }
 
+        // Atualizar senha
         user.updatePassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
 
@@ -252,20 +217,20 @@ public class UserServiceImpl implements UserService {
     public void resetPassword(UUID id, String newPassword) {
         log.info("Resetando senha do usuário ID: {}", id);
 
-        if (!userRepository.existsById(id)) {
-            throw new IllegalArgumentException("Usuário não encontrado com ID: " + id);
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Usuário não encontrado com ID: " + id));
+
+        // Validar nova senha
+        if (newPassword == null || newPassword.length() < 6) {
+            throw new IllegalArgumentException("Nova senha deve ter no mínimo 6 caracteres");
         }
 
-        Optional<User> userOpt = userRepository.findById(id);
-        User user = userOpt.orElse(null);
-
         user.updatePassword(passwordEncoder.encode(newPassword));
+        user.setCredentialsNonExpired(true); // Reativar credenciais se estavam expiradas
         userRepository.save(user);
 
         log.info("Senha resetada com sucesso - ID: {}", id);
     }
-
-    // === ESTATÍSTICAS ===
 
     @Override
     @Cacheable(value = "user-stats", key = "'total'")
@@ -286,5 +251,13 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public long getTotalUsersByRole(UserRole role) {
         return userRepository.countByRoleAndAtivoTrue(role);
+    }
+
+    private Pageable createPageable(int page, int size, String sort, String direction) {
+        Sort sortObj = Sort.by(
+                "desc".equalsIgnoreCase(direction) ? Sort.Direction.DESC : Sort.Direction.ASC,
+                sort
+        );
+        return PageRequest.of(page, size, sortObj);
     }
 }
