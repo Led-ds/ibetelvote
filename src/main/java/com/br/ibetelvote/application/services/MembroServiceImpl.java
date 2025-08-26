@@ -313,7 +313,7 @@ public class MembroServiceImpl implements MembroService {
     public MembroResponse uploadFotoMembro(UUID id, MembroUploadFotoRequest request) {
         log.info("Fazendo upload da foto do membro ID: {}", id);
 
-        Membro membro = membroRepository.findById(id)
+        Membro membro = membroRepository.findByUserId(id)
                 .orElseThrow(() -> new IllegalArgumentException("Membro não encontrado com ID: " + id));
 
         // Validar tamanho da foto (ex: máximo 5MB)
