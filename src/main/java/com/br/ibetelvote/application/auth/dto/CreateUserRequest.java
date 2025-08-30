@@ -1,6 +1,6 @@
 package com.br.ibetelvote.application.auth.dto;
 
-import com.br.ibetelvote.domain.entities.enus.UserRole;
+import com.br.ibetelvote.domain.entities.enums.UserRole;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

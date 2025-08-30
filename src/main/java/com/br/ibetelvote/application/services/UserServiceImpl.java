@@ -3,7 +3,7 @@ package com.br.ibetelvote.application.services;
 import com.br.ibetelvote.application.auth.dto.*;
 import com.br.ibetelvote.application.mapper.UserMapper;
 import com.br.ibetelvote.domain.entities.User;
-import com.br.ibetelvote.domain.entities.enus.UserRole;
+import com.br.ibetelvote.domain.entities.enums.UserRole;
 import com.br.ibetelvote.domain.services.UserService;
 import com.br.ibetelvote.infrastructure.repositories.UserJpaRepository;
 import lombok.RequiredArgsConstructor;

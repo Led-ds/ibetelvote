@@ -5,7 +5,7 @@ import com.br.ibetelvote.application.membro.dto.*;
 import com.br.ibetelvote.application.mapper.AuthMapper;
 import com.br.ibetelvote.domain.entities.Membro;
 import com.br.ibetelvote.domain.entities.User;
-import com.br.ibetelvote.domain.entities.enus.UserRole;
+import com.br.ibetelvote.domain.entities.enums.UserRole;
 import com.br.ibetelvote.domain.services.AutoCadastroService;
 import com.br.ibetelvote.infrastructure.jwt.JwtService;
 import com.br.ibetelvote.infrastructure.repositories.MembroJpaRepository;

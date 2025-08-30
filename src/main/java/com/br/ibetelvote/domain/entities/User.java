@@ -1,6 +1,6 @@
 package com.br.ibetelvote.domain.entities;
 
-import com.br.ibetelvote.domain.entities.enus.UserRole;
+import com.br.ibetelvote.domain.entities.enums.UserRole;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

@@ -1,7 +1,7 @@
 package com.br.ibetelvote.infrastructure.resources;
 
 import com.br.ibetelvote.application.auth.dto.*;
-import com.br.ibetelvote.domain.entities.enus.UserRole;
+import com.br.ibetelvote.domain.entities.enums.UserRole;
 import com.br.ibetelvote.domain.services.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

@@ -1,7 +1,7 @@
 package com.br.ibetelvote.domain.repositories;
 
 import com.br.ibetelvote.domain.entities.User;
-import com.br.ibetelvote.domain.entities.enus.UserRole;
+import com.br.ibetelvote.domain.entities.enums.UserRole;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 

@@ -1,6 +1,5 @@
-package com.br.ibetelvote.application.membro.dto;
+package com.br.ibetelvote.application.categoria.dto;
 
-import com.br.ibetelvote.domain.entities.enums.UserRole;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -12,10 +11,12 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserBasicInfo {
+public class CategoriaBasicInfo {
+
     private UUID id;
-    private String email;
-    private UserRole role;
-    private String formattedRole;
+    private String nome;
+    private Integer ordemExibicao;
     private Boolean ativo;
+    private String status;
+    private long totalCargos;
 }
