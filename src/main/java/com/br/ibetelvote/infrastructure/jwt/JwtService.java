@@ -6,7 +6,6 @@ import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
@@ -130,7 +129,7 @@ public class JwtService {
                     .userId(UUID.fromString(claims.getSubject()))
                     .email(claims.get("email", String.class))
                     .nome(claims.get("nome", String.class))
-                    .role(com.br.ibetelvote.domain.entities.enus.UserRole.valueOf(
+                    .role(com.br.ibetelvote.domain.entities.enums.UserRole.valueOf(
                             claims.get("role", String.class)
                     ))
                     .ativo(claims.get("ativo", Boolean.class))

@@ -1,4 +1,4 @@
-package com.br.ibetelvote.domain.entities.enus;
+package com.br.ibetelvote.domain.entities.enums;
 
 import lombok.Getter;
 

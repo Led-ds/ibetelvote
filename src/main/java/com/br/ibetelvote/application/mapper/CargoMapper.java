@@ -5,7 +5,11 @@ import com.br.ibetelvote.application.cargo.dto.CargoResponse;
 import com.br.ibetelvote.application.cargo.dto.CreateCargoRequest;
 import com.br.ibetelvote.application.cargo.dto.UpdateCargoRequest;
 import com.br.ibetelvote.domain.entities.Cargo;
+import com.br.ibetelvote.domain.entities.Categoria;
+import com.br.ibetelvote.domain.entities.enums.HierarquiaCargo;
+import com.br.ibetelvote.infrastructure.repositories.CategoriaJpaRepository;
 import org.mapstruct.*;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.List;
 import java.util.UUID;
@@ -13,28 +17,51 @@ import java.util.UUID;
 @Mapper(
         componentModel = "spring",
         unmappedTargetPolicy = ReportingPolicy.IGNORE,
-        nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE
+        nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
+        imports = {UUID.class, HierarquiaCargo.class}
 )
-public interface CargoMapper {
+public abstract class CargoMapper {
+
+    @Autowired
+    protected CategoriaJpaRepository categoriaRepository;
 
     // === CREATE MAPPING ===
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
-    Cargo toEntity(CreateCargoRequest request);
+    @Mapping(target = "categoria", source = "categoriaId", qualifiedByName = "mapCategoria")
+    @Mapping(target = "elegibilidadeJson", ignore = true) // Será tratado no afterMapping
+    public abstract Cargo toEntity(CreateCargoRequest request);
 
     // === RESPONSE MAPPINGS ===
+    @Mapping(target = "categoriaId", expression = "java(cargo.getCategoriaId())")
+    @Mapping(target = "categoriaNome", expression = "java(cargo.getCategoriaNome())")
+    @Mapping(target = "categoriaOrdemExibicao", source = "categoria.ordemExibicao")
+    @Mapping(target = "hierarquiaDisplayName", expression = "java(cargo.getHierarquiaDisplayName())")
+    @Mapping(target = "hierarquiaCor", expression = "java(cargo.getHierarquia() != null ? cargo.getHierarquia().getCor() : null)")
+    @Mapping(target = "hierarquiaIcone", expression = "java(cargo.getHierarquia() != null ? cargo.getHierarquia().getIcone() : null)")
+    @Mapping(target = "hierarquiaNivel", expression = "java(cargo.getHierarquia() != null ? cargo.getHierarquia().getOrdem() : null)")
+    @Mapping(target = "requisitoResumo", expression = "java(cargo.getRequisitoResumo())")
+    @Mapping(target = "elegibilidadeFormatada", expression = "java(cargo.getElegibilidadeFormatada())")
     @Mapping(target = "status", expression = "java(cargo.getStatus())")
     @Mapping(target = "displayName", expression = "java(cargo.getDisplayName())")
     @Mapping(target = "resumo", expression = "java(cargo.getResumo())")
     @Mapping(target = "temInformacoesCompletas", expression = "java(cargo.temInformacoesCompletas())")
     @Mapping(target = "podeSerUsadoEmEleicoes", expression = "java(cargo.podeSerUsadoEmEleicoes())")
-    CargoResponse toResponse(Cargo cargo);
+    @Mapping(target = "temCategoria", expression = "java(cargo.temCategoria())")
+    @Mapping(target = "proximaHierarquiaSugerida", expression = "java(cargo.getProximaHierarquiaSugerida())")
+    @Mapping(target = "totalCandidatos", constant = "0L") // Será implementado quando houver candidatos
+    @Mapping(target = "temCandidatos", constant = "false") // Será implementado quando houver candidatos
+    @Mapping(target = "estatisticasResumo", expression = "java(cargo.getEstatisticasResumo())")
+    @Mapping(target = "podeSerRemovido", constant = "true") // Validação será no service
+    @Mapping(target = "podeSerEditado", constant = "true") // Validação será no service
+    @Mapping(target = "podeSerPromovido", expression = "java(cargo.getProximaHierarquiaSugerida() != null)")
+    public abstract CargoResponse toResponse(Cargo cargo);
 
     /**
-     * Converte lista de entidades para lista de responses (usa toResponse)
+     * Converte lista de entidades para lista de responses
      */
-    default List<CargoResponse> toResponseList(List<Cargo> cargos) {
+    public List<CargoResponse> toResponseList(List<Cargo> cargos) {
         if (cargos == null) {
             return null;
         }
@@ -47,16 +74,22 @@ public interface CargoMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
-    void updateEntityFromRequest(UpdateCargoRequest request, @MappingTarget Cargo cargo);
+    @Mapping(target = "categoria", source = "categoriaId", qualifiedByName = "mapCategoria")
+    @Mapping(target = "elegibilidadeJson", ignore = true) // Será tratado no afterMapping
+    public abstract void updateEntityFromRequest(UpdateCargoRequest request, @MappingTarget Cargo cargo);
 
     // === BASIC INFO MAPPING ===
+    @Mapping(target = "categoriaId", expression = "java(cargo.getCategoriaId())")
+    @Mapping(target = "categoriaNome", expression = "java(cargo.getCategoriaNome())")
+    @Mapping(target = "hierarquiaDisplayName", expression = "java(cargo.getHierarquiaDisplayName())")
+    @Mapping(target = "hierarquiaIcone", expression = "java(cargo.getHierarquia() != null ? cargo.getHierarquia().getIcone() : null)")
     @Mapping(target = "status", expression = "java(cargo.getStatus())")
-    CargoBasicInfo toBasicInfo(Cargo cargo);
+    public abstract CargoBasicInfo toBasicInfo(Cargo cargo);
 
     /**
      * Converte lista de entidades para lista de basic info
      */
-    default List<CargoBasicInfo> toBasicInfoList(List<Cargo> cargos) {
+    public List<CargoBasicInfo> toBasicInfoList(List<Cargo> cargos) {
         if (cargos == null) {
             return null;
         }
@@ -68,12 +101,34 @@ public interface CargoMapper {
     // === MÉTODOS AUXILIARES ===
 
     /**
+     * Mapeia UUID da categoria para entidade Categoria
+     */
+    @Named("mapCategoria")
+    protected Categoria mapCategoria(UUID categoriaId) {
+        if (categoriaId == null) {
+            return null;
+        }
+        return categoriaRepository.findById(categoriaId).orElse(null);
+    }
+
+    /**
      * Prepara dados antes da criação da entidade
      */
     @BeforeMapping
-    default void beforeCreateMapping(CreateCargoRequest request) {
+    public void beforeCreateMapping(CreateCargoRequest request) {
         if (request.getNome() != null) {
             request.setNome(Cargo.normalizarNome(request.getNome()));
+        }
+
+        // Normalizar elegibilidade
+        if (request.getElegibilidade() != null && !request.getElegibilidade().isEmpty()) {
+            request.normalizarElegibilidade();
+        }
+
+        // Validar compatibilidade hierarquia-elegibilidade
+        if (!request.isHierarquiaCompativelComElegibilidade()) {
+            throw new IllegalArgumentException("Hierarquia " + request.getHierarquia() +
+                    " não é compatível com a elegibilidade informada");
         }
     }
 
@@ -81,64 +136,37 @@ public interface CargoMapper {
      * Prepara dados antes da atualização da entidade
      */
     @BeforeMapping
-    default void beforeUpdateMapping(UpdateCargoRequest request) {
+    public void beforeUpdateMapping(UpdateCargoRequest request) {
         if (request.getNome() != null) {
             request.setNome(Cargo.normalizarNome(request.getNome()));
+        }
+
+        // Normalizar elegibilidade se foi informada
+        if (request.getElegibilidade() != null && !request.getElegibilidade().isEmpty()) {
+            request.normalizarElegibilidade();
         }
     }
 
     /**
-     * Aplica validações após o mapeamento
+     * Processa dados após o mapeamento de criação
      */
     @AfterMapping
-    default void afterCreateMapping(@MappingTarget Cargo cargo, CreateCargoRequest request) {
+    public void afterCreateMapping(@MappingTarget Cargo cargo, CreateCargoRequest request) {
         // Garantir que o cargo tenha nome válido
         if (!Cargo.isNomeValido(cargo.getNome())) {
             throw new IllegalArgumentException("Nome do cargo inválido: " + cargo.getNome());
         }
-    }
 
-    /**
-     * Converte cargo para response simplificado (sem campos computados)
-     * Uso específico quando não precisamos de campos calculados
-     */
-    @Named("toSimpleResponse")
-    @Mapping(target = "status", ignore = true)
-    @Mapping(target = "displayName", ignore = true)
-    @Mapping(target = "resumo", ignore = true)
-    @Mapping(target = "temInformacoesCompletas", ignore = true)
-    @Mapping(target = "podeSerUsadoEmEleicoes", ignore = true)
-    CargoResponse toSimpleResponse(Cargo cargo);
-
-    /**
-     * Converte apenas os dados essenciais do cargo
-     * Uso específico para operações que precisam apenas dos dados básicos
-     */
-    @Named("toEssentialResponse")
-    default CargoResponse toEssentialResponse(Cargo cargo) {
-        if (cargo == null) {
-            return null;
+        // Definir elegibilidade via setter que converte para JSON
+        if (request.getElegibilidade() != null) {
+            cargo.setElegibilidade(request.getElegibilidade());
         }
 
-        return CargoResponse.builder()
-                .id(cargo.getId())
-                .nome(cargo.getNome())
-                .descricao(cargo.getDescricao())
-                .ativo(cargo.getAtivo())
-                .createdAt(cargo.getCreatedAt())
-                .updatedAt(cargo.getUpdatedAt())
-                .build();
-    }
-
-    /**
-     * Cria um basic info a partir de dados mínimos
-     */
-    default CargoBasicInfo createBasicInfo(UUID id, String nome, Boolean ativo) {
-        return CargoBasicInfo.builder()
-                .id(id)
-                .nome(nome)
-                .ativo(ativo)
-                .status(ativo != null && ativo ? "Ativo" : "Inativo")
-                .build();
+        // Validar se pode ser disponibilizado para eleições
+        if (request.getDisponivelEleicao() != null && request.getDisponivelEleicao()) {
+            if (!request.podeSerDisponibilizadoParaEleicoes()) {
+                throw new IllegalArgumentException("Cargo não possui informações suficientes para ser disponibilizado para eleições");
+            }
+        }
     }
 }
