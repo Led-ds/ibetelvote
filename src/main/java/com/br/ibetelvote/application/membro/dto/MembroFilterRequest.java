@@ -18,8 +18,12 @@ public class MembroFilterRequest {
     private String nomeCargo; // ADICIONADO: para busca por nome do cargo
     private Boolean ativo;
     private Boolean hasUser;
+    @Builder.Default
     private int page = 0;
+    @Builder.Default
     private int size = 20;
+    @Builder.Default
     private String sort = "nome";
+    @Builder.Default
     private String direction = "asc";
 }

@@ -32,8 +32,6 @@ public class VotarRequest {
 
         private UUID candidatoId;
 
-        private UUID cargoId;
-
         @Builder.Default
         private Boolean votoBranco = false;
 

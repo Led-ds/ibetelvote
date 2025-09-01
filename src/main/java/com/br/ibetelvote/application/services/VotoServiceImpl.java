@@ -69,9 +69,9 @@ public class VotoServiceImpl implements VotoService {
 
         // Determinar tipo de voto
         if (Boolean.TRUE.equals(votoIndividual.getVotoBranco())) {
-            voto = Voto.criarVotoBranco(membroId, eleicaoId, votoIndividual.getCargoId());
+            voto = Voto.criarVotoBranco(membroId, eleicaoId, votoIndividual.getCargoPretendidoId());
         } else if (Boolean.TRUE.equals(votoIndividual.getVotoNulo())) {
-            voto = Voto.criarVotoNulo(membroId, eleicaoId, votoIndividual.getCargoId());
+            voto = Voto.criarVotoNulo(membroId, eleicaoId, votoIndividual.getCargoPretendidoId());
         } else if (votoIndividual.getCandidatoId() != null) {
             Candidato candidato = candidatoRepository.findById(votoIndividual.getCandidatoId())
                     .orElseThrow(() -> new IllegalArgumentException("Candidato não encontrado"));
@@ -80,7 +80,7 @@ public class VotoServiceImpl implements VotoService {
                 throw new IllegalArgumentException("Candidato não está disponível para receber votos");
             }
 
-            if (!candidato.getCargoPretendidoId().equals(votoIndividual.getCargoId())) {
+            if (!candidato.getCargoPretendidoId().equals(votoIndividual.getCargoPretendidoId())) {
                 throw new IllegalArgumentException("Candidato não pertence ao cargo especificado");
             }
 
@@ -315,15 +315,15 @@ public class VotoServiceImpl implements VotoService {
 
             for (VotarRequest.VotoIndividual voto : request.getVotos()) {
                 // Verificar voto duplicado no mesmo cargo
-                if (cargosVotados.contains(voto.getCargoId())) {
+                if (cargosVotados.contains(voto.getCargoPretendidoId())) {
                     erros.add("Não é possível votar duas vezes no mesmo cargo");
                     continue;
                 }
-                cargosVotados.add(voto.getCargoId());
+                cargosVotados.add(voto.getCargoPretendidoId());
 
-                Cargo cargo = cargoRepository.findById(voto.getCargoId()).orElse(null);
+                Cargo cargo = cargoRepository.findById(voto.getCargoPretendidoId()).orElse(null);
                 if (cargo == null) {
-                    erros.add("Cargo não encontrado: " + voto.getCargoId());
+                    erros.add("Cargo não encontrado: " + voto.getCargoPretendidoId());
                     continue;
                 }
 
@@ -349,7 +349,7 @@ public class VotoServiceImpl implements VotoService {
                     if (candidato == null) {
                         erros.add("Candidato não encontrado: " + voto.getCandidatoId());
                     } else {
-                        if (!candidato.getCargoPretendidoId().equals(voto.getCargoId())) {
+                        if (!candidato.getCargoPretendidoId().equals(voto.getCargoPretendidoId())) {
                             erros.add("Candidato não pertence ao cargo especificado");
                         } else if (!candidato.podeReceberVotos()) {
                             erros.add("Candidato não está disponível para receber votos");
@@ -422,15 +422,44 @@ public class VotoServiceImpl implements VotoService {
 
         // Distribuição por tipo
         List<Object[]> distribuicao = votoRepository.findDistribuicaoVotosPorTipo(eleicaoId);
-        resumo.put("distribuicaoTipos", distribuicao);
+
+        List<Map<String, Object>> distribuicaoMap = new ArrayList<>();
+        for (Object[] item : distribuicao) {
+            Map<String, Object> dist = new HashMap<>();
+            dist.put("votosValidos", item[0]);
+            dist.put("votosBranco", item[1]);
+            dist.put("votosNulo", item[2]);
+            dist.put("totalVotos", item[3]);
+            distribuicaoMap.add(dist);
+        }
+        resumo.put("distribuicaoTipos", distribuicaoMap);
 
         // Resumo por cargo
         List<Object[]> resumoPorCargo = votoRepository.getResumoVotacaoPorCargo(eleicaoId);
-        resumo.put("resumoPorCargo", resumoPorCargo);
+
+        List<Map<String, Object>> cargosMap = new ArrayList<>();
+        for (Object[] item : resumoPorCargo) {
+            Map<String, Object> cargo = new HashMap<>();
+            cargo.put("nomeCargo", item[0]);
+            cargo.put("totalVotos", item[1]);
+            cargo.put("votosValidos", item[2]);
+            cargo.put("votosBranco", item[3]);
+            cargo.put("votosNulo", item[4]);
+            cargosMap.add(cargo);
+        }
+        resumo.put("resumoPorCargo", cargosMap);
 
         // Participação por cargo do membro
         List<Object[]> participacao = votoRepository.getParticipacaoPorCargoMembro(eleicaoId);
-        resumo.put("participacaoPorCargo", participacao);
+
+        List<Map<String, Object>> participacaoMap = new ArrayList<>();
+        for (Object[] item : participacao) {
+            Map<String, Object> part = new HashMap<>();
+            part.put("cargoMembro", item[0]);
+            part.put("quantidadeVotantes", item[1]);
+            participacaoMap.add(part);
+        }
+        resumo.put("participacaoPorCargo", participacaoMap);
 
         return resumo;
     }

@@ -207,12 +207,109 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/cargos/*/ativar").hasRole("ADMINISTRADOR")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/cargos/*/desativar").hasRole("ADMINISTRADOR")
 
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cargos/categoria/*/ordenados").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cargos/categoria/*/ativos").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cargos/categoria/*/disponiveis").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+
                         // CRUD BÁSICO
                         .requestMatchers(HttpMethod.GET, "/api/v1/cargos/*").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
                         .requestMatchers(HttpMethod.GET, "/api/v1/cargos").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
                         .requestMatchers(HttpMethod.POST, "/api/v1/cargos").hasRole("ADMINISTRADOR")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/cargos/**").hasRole("ADMINISTRADOR")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/cargos/**").hasRole("ADMINISTRADOR")
+
+                        // Hierarquia específica
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cargos/hierarquia/*/ativos").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cargos/ministeriais").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cargos/ministeriais/ativos").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cargos/lideranca").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cargos/administrativos").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+
+                        // Operações específicas
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cargos/incompletos").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cargos/com-candidatos").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+
+                        // Status avançado
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/cargos/*/ativar-para-eleicao").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/cargos/*/desativar-para-eleicao").hasRole("ADMINISTRADOR")
+
+                        // Precedência
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/cargos/*/alterar-ordem").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cargos/categoria/*/proxima-ordem").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/cargos/categoria/*/reorganizar-ordens").hasRole("ADMINISTRADOR")
+
+                        // Elegibilidade
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cargos/elegiveis-para/**").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/cargos/verificar-elegibilidade").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+
+                        // Validações específicas
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cargos/categoria/*/ordem/*/disponivel").hasRole("ADMINISTRADOR")
+
+                        // Relatórios
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cargos/relatorios/**").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+
+                        // Utilitários
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cargos/categoria/*/basic-info").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cargos/hierarquias-disponiveis").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/cargos/niveis-elegibilidade").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+
+                        // Operações em lote
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/cargos/ativar-multiplos").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/cargos/desativar-multiplos").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/cargos/deletar-multiplos").hasRole("ADMINISTRADOR")
+
+
+                        // ===============================================
+                        // CATEGORIA
+                        // ===============================================
+
+                        //CONTROLLER
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categorias").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categorias/all").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/categorias/**").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/categorias/**").hasRole("ADMINISTRADOR")
+
+                        // Operações de status
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/categorias/*/ativar").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/categorias/*/desativar").hasRole("ADMINISTRADOR")
+
+                        // Consultas específicas
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categorias/ativas").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categorias/ativas/page").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categorias/inativas").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categorias/ordenadas").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categorias/para-selecao").hasAnyRole("MEMBRO", "UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categorias/com-cargos").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categorias/com-cargos-ativos").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categorias/com-cargos-disponiveis").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categorias/search").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+
+                        // Operações de ordem
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categorias/proxima-ordem").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/categorias/reorganizar-ordens").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/categorias/*/alterar-ordem").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/categorias/*/mover-para-cima").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/categorias/*/mover-para-baixo").hasRole("ADMINISTRADOR")
+
+                        // Validações
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categorias/exists/nome").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categorias/disponivel/nome").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categorias/*/can-delete").hasRole("ADMINISTRADOR")
+
+                        // Estatísticas
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categorias/stats/**").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+
+                        // Relatórios
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categorias/relatorios/**").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+
+                        // Operações em lote
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/categorias/desativar-multiplas").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/categorias/deletar-multiplas").hasRole("ADMINISTRADOR")
+
+                        // Administrativas
+                        .requestMatchers(HttpMethod.POST, "/api/v1/categorias/admin/**").hasRole("ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categorias/admin/**").hasRole("ADMINISTRADOR")
+
 
                         // ===============================================
                         // MEMBROS (ORDEM ESPECÍFICA → GERAL)
@@ -317,6 +414,12 @@ public class SecurityConfig {
                         // ENDPOINTS DEPRECATED (COMPATIBILIDADE)
                         .requestMatchers(HttpMethod.GET, "/api/v1/votos/cargo/*/total").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
                         .requestMatchers(HttpMethod.GET, "/api/v1/votos/cargo/*").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+
+                        // Relatórios e estatísticas específicas
+                        .requestMatchers(HttpMethod.GET, "/api/v1/votos/stats/validos").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/votos/stats/branco").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/votos/stats/nulo").hasAnyRole("UTILIZADOR_PRO", "ADMINISTRADOR")
+
 
                         // ===============================================
                         // USUÁRIOS (ADMIN ONLY)

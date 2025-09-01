@@ -32,8 +32,11 @@ public class CreateEleicaoRequest {
     @Positive(message = "Total de elegíveis deve ser positivo")
     private Integer totalElegiveis;
 
+    @Builder.Default
     private Boolean permiteVotoBranco = true;
+    @Builder.Default
     private Boolean permiteVotoNulo = true;
+    @Builder.Default
     private Boolean exibeResultadosParciais = false;
 
     @Size(max = 2000, message = "Instruções de votação deve ter no máximo 2000 caracteres")

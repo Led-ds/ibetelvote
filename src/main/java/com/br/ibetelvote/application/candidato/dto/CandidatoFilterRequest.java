@@ -22,8 +22,14 @@ public class CandidatoFilterRequest {
     private String numeroCandidato;
     private Boolean temFoto;
     private Boolean candidaturaCompleta;
+
+    @Builder.Default
     private int page = 0;
+    @Builder.Default
     private int size = 20;
+
+    @Builder.Default
     private String sort = "nomeCandidato";
+    @Builder.Default
     private String direction = "asc";
 }
