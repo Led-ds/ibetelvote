@@ -16,8 +16,12 @@ public class EleicaoFilterRequest {
     private String status; // "aberta", "encerrada", "futura"
     private Boolean temCandidatos;
     private Boolean temCandidatosAprovados;
+    @Builder.Default
     private int page = 0;
+    @Builder.Default
     private int size = 20;
+    @Builder.Default
     private String sort = "dataInicio";
+    @Builder.Default
     private String direction = "desc";
 }

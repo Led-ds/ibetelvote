@@ -60,13 +60,26 @@ public interface CargoJpaRepository extends JpaRepository<Cargo, UUID>, CargoRep
     // === CONSULTAS POR CATEGORIA ===
 
     List<Cargo> findByCategoria(Categoria categoria);
-    List<Cargo> findByCategoriaId(UUID categoriaId);
+
+    @Query("SELECT c FROM Cargo c WHERE c.categoria.id = :categoriaId")
+    List<Cargo> findByCategoriaId(@Param("categoriaId") UUID categoriaId);
+
     List<Cargo> findByCategoriaAndAtivoTrue(Categoria categoria);
-    List<Cargo> findByCategoriaIdAndAtivoTrue(UUID categoriaId);
+
     Page<Cargo> findByCategoria(Categoria categoria, Pageable pageable);
-    Page<Cargo> findByCategoriaId(UUID categoriaId, Pageable pageable);
+
+    @Query("SELECT c FROM Cargo c WHERE c.categoria.id = :categoriaId")
+    Page<Cargo> findByCategoriaId(@Param("categoriaId") UUID categoriaId, Pageable pageable);
+
+
     long countByCategoria(Categoria categoria);
-    long countByCategoriaId(UUID categoriaId);
+
+    @Query("SELECT COUNT(c) FROM Cargo c WHERE c.categoria.id = :categoriaId")
+    long countByCategoriaId(@Param("categoriaId") UUID categoriaId);
+
+    @Query("SELECT c FROM Cargo c WHERE c.categoria.id = :categoriaId AND c.ativo = true")
+    List<Cargo> findByCategoriaIdAndAtivoTrue(@Param("categoriaId") UUID categoriaId);
+
 
     // Consultas por categoria com ordenação
     @Query("SELECT c FROM Cargo c WHERE c.categoria = :categoria ORDER BY c.ordemPrecedencia ASC NULLS LAST, c.nome ASC")
@@ -87,7 +100,10 @@ public interface CargoJpaRepository extends JpaRepository<Cargo, UUID>, CargoRep
 
     // Hierarquia com categoria
     List<Cargo> findByCategoriaAndHierarquia(Categoria categoria, HierarquiaCargo hierarquia);
-    List<Cargo> findByCategoriaIdAndHierarquia(UUID categoriaId, HierarquiaCargo hierarquia);
+
+    @Query("SELECT c FROM Cargo c WHERE c.categoria.id = :categoriaId AND c.hierarquia = :hierarquia")
+    List<Cargo> findByCategoriaIdAndHierarquia(@Param("categoriaId") UUID categoriaId, @Param("hierarquia") HierarquiaCargo hierarquia);
+
 
     // Múltiplas hierarquias
     List<Cargo> findByHierarquiaIn(List<HierarquiaCargo> hierarquias);
@@ -97,10 +113,16 @@ public interface CargoJpaRepository extends JpaRepository<Cargo, UUID>, CargoRep
 
     List<Cargo> findByOrdemPrecedenciaBetween(Integer ordemMin, Integer ordemMax);
     Optional<Cargo> findByCategoriaAndOrdemPrecedencia(Categoria categoria, Integer ordemPrecedencia);
-    Optional<Cargo> findByCategoriaIdAndOrdemPrecedencia(UUID categoriaId, Integer ordemPrecedencia);
     boolean existsByCategoriaAndOrdemPrecedencia(Categoria categoria, Integer ordemPrecedencia);
-    boolean existsByCategoriaIdAndOrdemPrecedencia(UUID categoriaId, Integer ordemPrecedencia);
+
+    @Query("SELECT CASE WHEN COUNT(c) > 0 THEN true ELSE false END FROM Cargo c WHERE c.categoria.id = :categoriaId AND c.ordemPrecedencia = :ordemPrecedencia")
+    boolean existsByCategoriaIdAndOrdemPrecedencia(@Param("categoriaId") UUID categoriaId, @Param("ordemPrecedencia") Integer ordemPrecedencia);
+
     boolean existsByCategoriaAndOrdemPrecedenciaAndIdNot(Categoria categoria, Integer ordemPrecedencia, UUID id);
+
+    @Query("SELECT c FROM Cargo c WHERE c.categoria.id = :categoriaId AND c.ordemPrecedencia = :ordemPrecedencia")
+    Optional<Cargo> findByCategoriaIdAndOrdemPrecedencia(@Param("categoriaId") UUID categoriaId,
+                                                         @Param("ordemPrecedencia") Integer ordemPrecedencia);
 
     // Próxima ordem disponível
     @Query("SELECT COALESCE(MAX(c.ordemPrecedencia), 0) + 1 FROM Cargo c WHERE c.categoria = :categoria")
@@ -124,16 +146,19 @@ public interface CargoJpaRepository extends JpaRepository<Cargo, UUID>, CargoRep
     @Query("SELECT c FROM Cargo c WHERE c.ativo = true AND c.hierarquia <= :hierarquia ORDER BY c.hierarquia, c.nome")
     List<Cargo> findCargosElegiveisParaHierarquia(@Param("hierarquia") HierarquiaCargo hierarquia);
 
-    /**
-     * Busca cargos que contêm determinada elegibilidade no JSON
-     */
-    @Query(value = "SELECT * FROM cargos c WHERE c.ativo = true AND c.elegibilidade::text LIKE %:elegibilidade%", nativeQuery = true)
+    @Query(value = """
+        SELECT c.* FROM cargos c 
+        WHERE c.ativo = true 
+        AND c.elegibilidade::text LIKE CONCAT('%', :elegibilidade, '%')
+        """, nativeQuery = true)
     List<Cargo> findCargosPorElegibilidade(@Param("elegibilidade") String elegibilidade);
 
-    /**
-     * Busca cargos que permitem candidatura de determinado nível
-     */
-    @Query(value = "SELECT * FROM cargos c WHERE c.ativo = true AND c.disponivelEleicao = true AND c.elegibilidade ? :elegibilidade", nativeQuery = true)
+    @Query(value = """
+        SELECT c.* FROM cargos c 
+        WHERE c.ativo = true 
+        AND c.disponivel_eleicao = true
+        AND jsonb_exists(c.elegibilidade, :elegibilidade)
+        """, nativeQuery = true)
     List<Cargo> findCargosQuePermitemElegibilidade(@Param("elegibilidade") String elegibilidade);
 
     /**
@@ -492,15 +517,14 @@ public interface CargoJpaRepository extends JpaRepository<Cargo, UUID>, CargoRep
             """)
     List<Cargo> findCargosParaReorganizacao(@Param("categoriaId") UUID categoriaId);
 
-    /**
-     * Busca cargos elegíveis para determinado membro (baseado em elegibilidade específica)
-     */
     @Query(value = """
-            SELECT c.* FROM cargos c 
-            WHERE c.ativo = true 
-            AND c.disponivel_eleicao = true
-            AND c.elegibilidade ? :nivelMembro
-            ORDER BY c.hierarquia, c.nome
-            """, nativeQuery = true)
+        SELECT c.* FROM cargos c 
+        WHERE c.ativo = true 
+        AND c.disponivel_eleicao = true
+        AND jsonb_exists(c.elegibilidade, :nivelMembro)
+        ORDER BY c.hierarquia, c.nome
+        """, nativeQuery = true)
     List<Cargo> findCargosElegiveisParaMembro(@Param("nivelMembro") String nivelMembro);
+
+
 }
