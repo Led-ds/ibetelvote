@@ -195,7 +195,7 @@ public class VotoController {
     @Deprecated
     public ResponseEntity<List<VotoResponse>> getVotosByCargo(@PathVariable UUID cargoId) {
         log.warn("Endpoint deprecated usado: /cargo/{} - Use /cargo-pretendido/{} instead", cargoId, cargoId);
-        List<VotoResponse> votos = votoService.getVotosByCargoId(cargoId);
+        List<VotoResponse> votos = votoService.getVotosByCargoPretendidoId(cargoId);
         return ResponseEntity.ok(votos);
     }
 
@@ -205,7 +205,7 @@ public class VotoController {
     @Deprecated
     public ResponseEntity<Long> getTotalVotosByCargo(@PathVariable UUID cargoId) {
         log.warn("Endpoint deprecated usado: /cargo/{}/total - Use /cargo-pretendido/{}/total instead", cargoId, cargoId);
-        long total = votoService.getTotalVotosByCargo(cargoId);
+        long total = votoService.getTotalVotosByCargoPretendido(cargoId);
         return ResponseEntity.ok(total);
     }
 

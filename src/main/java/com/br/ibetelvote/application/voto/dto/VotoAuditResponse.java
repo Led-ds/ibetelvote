@@ -1,5 +1,6 @@
 package com.br.ibetelvote.application.voto.dto;
 
+import com.br.ibetelvote.domain.entities.enums.TipoVoto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,17 +18,23 @@ public class VotoAuditResponse {
     private UUID id;
     private UUID eleicaoId;
     private UUID cargoPretendidoId;
+
+    private TipoVoto tipoVoto;
+
+    // Mantendo para compatibilidade
+    @Deprecated
     private Boolean votoBranco;
+    @Deprecated
     private Boolean votoNulo;
+
     private LocalDateTime dataVoto;
 
-    // === DADOS SEGUROS PARA AUDITORIA ===
+    // Dados seguros para auditoria
     private String nomeEleicao;
     private String nomeCargoPretendido;
-    private String tipoVoto;
     private String dataVotoFormatada;
     private boolean votoValido;
+    private String tipoVotoDescricao;
+    private String statusVoto;
 
-    // === SEM DADOS SENSÍVEIS ===
-    // Não inclui: membroId, candidatoId, hashVoto, IP
 }
