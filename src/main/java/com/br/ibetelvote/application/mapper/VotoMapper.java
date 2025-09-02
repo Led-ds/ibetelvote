@@ -5,6 +5,7 @@ import com.br.ibetelvote.application.voto.dto.VotoAuditResponse;
 import com.br.ibetelvote.application.voto.dto.VotoResponse;
 import com.br.ibetelvote.application.voto.dto.VotoStatsResponse;
 import com.br.ibetelvote.domain.entities.Voto;
+import com.br.ibetelvote.domain.entities.enums.TipoVoto;
 import org.mapstruct.*;
 
 import java.util.List;
@@ -17,7 +18,6 @@ import java.util.ArrayList;
 )
 public interface VotoMapper {
 
-    // === VOTO RESPONSE MAPPING ===
     default VotoResponse toResponse(Voto voto) {
         if (voto == null) {
             return null;
@@ -25,32 +25,39 @@ public interface VotoMapper {
 
         return VotoResponse.builder()
                 .id(voto.getId())
-                .membroId(voto.getMembroId())
-                .eleicaoId(voto.getEleicaoId())
-                .cargoPretendidoId(voto.getCargoPretendidoId())
-                .candidatoId(voto.getCandidatoId())
-                .votoBranco(voto.getVotoBranco())
-                .votoNulo(voto.getVotoNulo())
+                .membroId(voto.getMembro() != null ? voto.getMembro().getId() : null)
+                .eleicaoId(voto.getEleicao() != null ? voto.getEleicao().getId() : null)
+                .cargoPretendidoId(voto.getCargoPretendido() != null ? voto.getCargoPretendido().getId() : null)
+                .candidatoId(voto.getCandidato() != null ? voto.getCandidato().getId() : null)
+
+                .tipoVoto(voto.getTipoVoto())
+
+                // Mapear boolean para compatibilidade
+                .votoBranco(TipoVoto.BRANCO.equals(voto.getTipoVoto()))
+                .votoNulo(TipoVoto.NULO.equals(voto.getTipoVoto()))
+
                 .hashVoto(voto.getHashVoto())
                 .dataVoto(voto.getDataVoto())
-                // Dados relacionados
+
                 .nomeEleicao(voto.getNomeEleicao())
                 .nomeCargoPretendido(voto.getNomeCargoPretendido())
                 .nomeCandidato(voto.getNomeCandidato())
                 .numeroCandidato(voto.getNumeroCandidato())
-                .tipoVoto(voto.getTipoVoto())
+                .nomeMembro(voto.getNomeMembro())
                 .dataVotoFormatada(voto.getDataVotoFormatada())
+
                 // Dados adicionais
                 .resumoVoto(voto.getResumoVoto())
                 .votoSeguro(voto.isVotoSeguro())
                 .ipMascarado(voto.getIpMascarado())
+
                 // Campos computados
                 .votoValido(voto.isVotoValido())
-                .statusVoto(voto.getTipoVoto())
+                .statusVoto(voto.getTipoVotoDescricao())
+                .tipoVotoDescricao(voto.getTipoVotoDescricao())
                 .build();
     }
 
-    // === VOTO AUDIT RESPONSE MAPPING ===
     default VotoAuditResponse toAuditResponse(Voto voto) {
         if (voto == null) {
             return null;
@@ -58,122 +65,45 @@ public interface VotoMapper {
 
         return VotoAuditResponse.builder()
                 .id(voto.getId())
-                .eleicaoId(voto.getEleicaoId())
-                .cargoPretendidoId(voto.getCargoPretendidoId())
-                .votoBranco(voto.getVotoBranco())
-                .votoNulo(voto.getVotoNulo())
+                .eleicaoId(voto.getEleicao() != null ? voto.getEleicao().getId() : null)
+                .cargoPretendidoId(voto.getCargoPretendido() != null ? voto.getCargoPretendido().getId() : null)
+
+                .tipoVoto(voto.getTipoVoto())
+
+                //COMPATIBILIDADE
+                .votoBranco(TipoVoto.BRANCO.equals(voto.getTipoVoto()))
+                .votoNulo(TipoVoto.NULO.equals(voto.getTipoVoto()))
+
                 .dataVoto(voto.getDataVoto())
+
                 // Dados seguros
                 .nomeEleicao(voto.getNomeEleicao())
                 .nomeCargoPretendido(voto.getNomeCargoPretendido())
-                .tipoVoto(voto.getTipoVoto())
                 .dataVotoFormatada(voto.getDataVotoFormatada())
                 .votoValido(voto.isVotoValido())
+                .tipoVotoDescricao(voto.getTipoVotoDescricao())
+                .statusVoto(voto.getTipoVotoDescricao())
                 .build();
     }
 
-    // === LISTAS ===
     default List<VotoResponse> toResponseList(List<Voto> votos) {
         if (votos == null) {
-            return null;
+            return new ArrayList<>();
         }
-        List<VotoResponse> list = new ArrayList<>(votos.size());
-        for (Voto voto : votos) {
-            list.add(toResponse(voto));
-        }
-        return list;
+        return votos.stream()
+                .map(this::toResponse)
+                .collect(java.util.stream.Collectors.toList());
     }
 
     default List<VotoAuditResponse> toAuditResponseList(List<Voto> votos) {
         if (votos == null) {
-            return null;
+            return new ArrayList<>();
         }
-        List<VotoAuditResponse> list = new ArrayList<>(votos.size());
-        for (Voto voto : votos) {
-            list.add(toAuditResponse(voto));
-        }
-        return list;
+        return votos.stream()
+                .map(this::toAuditResponse)
+                .collect(java.util.stream.Collectors.toList());
     }
 
-    // === VOTO STATS RESPONSE MAPPING ===
-    default VotoStatsResponse toStatsResponse(java.util.Map<String, Object> stats) {
-        if (stats == null) {
-            return null;
-        }
-
-        VotoStatsResponse.VotoStatsResponseBuilder builder = VotoStatsResponse.builder();
-
-        // Estatísticas básicas
-        if (stats.containsKey("totalVotos")) {
-            builder.totalVotos(((Number) stats.get("totalVotos")).longValue());
-        }
-        if (stats.containsKey("votosValidos")) {
-            builder.votosValidos(((Number) stats.get("votosValidos")).longValue());
-        }
-        if (stats.containsKey("votosBranco")) {
-            builder.votosBranco(((Number) stats.get("votosBranco")).longValue());
-        }
-        if (stats.containsKey("votosNulo")) {
-            builder.votosNulo(((Number) stats.get("votosNulo")).longValue());
-        }
-        if (stats.containsKey("votantesUnicos")) {
-            builder.votantesUnicos(((Number) stats.get("votantesUnicos")).longValue());
-        }
-
-        // Calcular percentuais
-        long total = builder.build().getTotalVotos();
-        if (total > 0) {
-            builder.percentualVotosValidos((builder.build().getVotosValidos() * 100.0) / total);
-            builder.percentualVotosBranco((builder.build().getVotosBranco() * 100.0) / total);
-            builder.percentualVotosNulo((builder.build().getVotosNulo() * 100.0) / total);
-        }
-
-        return builder.build();
-    }
-
-    // === VALIDAR VOTACAO RESPONSE MAPPING ===
-    default ValidarVotacaoResponse toValidarVotacaoResponse(
-            boolean votacaoValida,
-            List<String> erros,
-            List<String> avisos,
-            boolean membroElegivel,
-            boolean eleicaoDisponivel,
-            boolean jaVotou) {
-
-        return ValidarVotacaoResponse.builder()
-                .votacaoValida(votacaoValida && erros.isEmpty())
-                .erros(erros != null ? erros : new ArrayList<>())
-                .avisos(avisos != null ? avisos : new ArrayList<>())
-                .membroElegivel(membroElegivel)
-                .eleicaoDisponivel(eleicaoDisponivel)
-                .jaVotou(jaVotou)
-                .build();
-    }
-
-    // === HELPER METHODS ===
-
-    /**
-     * Converte lista de Object[] (do repository) para VotoStatsResponse
-     */
-    default VotoStatsResponse fromObjectArrayToStats(List<Object[]> resultados) {
-        if (resultados == null || resultados.isEmpty()) {
-            return VotoStatsResponse.builder().build();
-        }
-
-        // Assumindo que o primeiro resultado tem: [totalVotos, votosValidos, votosBranco, votosNulo]
-        Object[] primeiro = resultados.get(0);
-
-        return VotoStatsResponse.builder()
-                .totalVotos(((Number) primeiro[0]).longValue())
-                .votosValidos(primeiro.length > 1 ? ((Number) primeiro[1]).longValue() : 0)
-                .votosBranco(primeiro.length > 2 ? ((Number) primeiro[2]).longValue() : 0)
-                .votosNulo(primeiro.length > 3 ? ((Number) primeiro[3]).longValue() : 0)
-                .build();
-    }
-
-    /**
-     * Converte Map de estatísticas para VotoStatsResponse
-     */
     default VotoStatsResponse fromMapToStats(java.util.Map<String, Long> stats) {
         if (stats == null) {
             return VotoStatsResponse.builder().build();
@@ -183,14 +113,16 @@ public interface VotoMapper {
         long validos = stats.getOrDefault("votosValidos", 0L);
         long branco = stats.getOrDefault("votosBranco", 0L);
         long nulo = stats.getOrDefault("votosNulo", 0L);
+        long votantes = stats.getOrDefault("votantesUnicos", 0L);
 
         VotoStatsResponse.VotoStatsResponseBuilder builder = VotoStatsResponse.builder()
                 .totalVotos(total)
                 .votosValidos(validos)
                 .votosBranco(branco)
-                .votosNulo(nulo);
+                .votosNulo(nulo)
+                .votantesUnicos(votantes);
 
-        // Calcular percentuais se houver votos
+        // Calcular percentuais
         if (total > 0) {
             builder.percentualVotosValidos((validos * 100.0) / total)
                     .percentualVotosBranco((branco * 100.0) / total)
@@ -200,9 +132,26 @@ public interface VotoMapper {
         return builder.build();
     }
 
-    /**
-     * Mapeia lista de Object[] para lista de Maps (para relatórios)
-     */
+    default ValidarVotacaoResponse toValidarVotacaoResponse(
+            boolean votacaoValida,
+            List<String> erros,
+            List<String> avisos,
+            int totalVotos,
+            boolean membroElegivel,
+            boolean eleicaoDisponivel,
+            boolean jaVotou) {
+
+        return ValidarVotacaoResponse.builder()
+                .votacaoValida(votacaoValida && (erros == null || erros.isEmpty()))
+                .erros(erros != null ? erros : new ArrayList<>())
+                .avisos(avisos != null ? avisos : new ArrayList<>())
+                .totalVotos(totalVotos)
+                .membroElegivel(membroElegivel)
+                .eleicaoDisponivel(eleicaoDisponivel)
+                .jaVotou(jaVotou)
+                .build();
+    }
+
     default List<java.util.Map<String, Object>> fromObjectArrayToMapList(
             List<Object[]> resultados,
             String... nomesColuna) {
@@ -211,55 +160,56 @@ public interface VotoMapper {
             return new ArrayList<>();
         }
 
-        List<java.util.Map<String, Object>> lista = new ArrayList<>();
-
-        for (Object[] resultado : resultados) {
-            java.util.Map<String, Object> item = new java.util.HashMap<>();
-
-            for (int i = 0; i < Math.min(resultado.length, nomesColuna.length); i++) {
-                item.put(nomesColuna[i], resultado[i]);
-            }
-
-            lista.add(item);
-        }
-
-        return lista;
+        return resultados.stream()
+                .map(resultado -> {
+                    java.util.Map<String, Object> item = new java.util.HashMap<>();
+                    for (int i = 0; i < Math.min(resultado.length, nomesColuna.length); i++) {
+                        item.put(nomesColuna[i], resultado[i]);
+                    }
+                    return item;
+                })
+                .collect(java.util.stream.Collectors.toList());
     }
 
-    // === VALIDAÇÕES PRE-MAPPING ===
     @BeforeMapping
     default void validarVoto(Voto voto) {
         if (voto != null) {
             try {
                 voto.validarConsistencia();
             } catch (Exception e) {
-                // Log do erro mas não impede o mapeamento
-                System.err.println("Erro na validação do voto: " + e.getMessage());
+                // Log mas não impede mapeamento
+                System.err.println("Aviso na validação do voto: " + e.getMessage());
             }
         }
     }
 
-    // === VALIDAÇÕES PÓS-MAPPING ===
     @AfterMapping
     default void completarDadosResponse(@MappingTarget VotoResponse response, Voto voto) {
         if (response != null && voto != null) {
-            // Garantir que campos computados estão corretos
+            // Garantir consistência dos campos computados
             response.setVotoValido(voto.isVotoValido());
-            response.setStatusVoto(voto.getTipoVoto());
+            response.setStatusVoto(voto.getTipoVotoDescricao());
 
-            // Garantir que dados sensíveis são mascarados se necessário
+            // Mascarar hash se muito longo (segurança)
             if (response.getHashVoto() != null && response.getHashVoto().length() > 8) {
-                // Manter apenas os primeiros 8 caracteres do hash
                 response.setHashVoto(response.getHashVoto().substring(0, 8) + "...");
             }
+
+            response.setVotoBranco(TipoVoto.BRANCO.equals(response.getTipoVoto()));
+            response.setVotoNulo(TipoVoto.NULO.equals(response.getTipoVoto()));
         }
     }
 
     @AfterMapping
-    default void garantirSegurancaAuditoria(@MappingTarget VotoAuditResponse response) {
+    default void garantirSegurancaAuditoria(@MappingTarget VotoAuditResponse response, Voto voto) {
         if (response != null) {
-            // Garantir que não há dados sensíveis no response de auditoria
-            // (já implementado no método toAuditResponse, mas reforça a segurança)
+            // Garantir que não há vazamento de dados sensíveis
+            // (método já é seguro, mas reforça)
+
+            if (response.getTipoVoto() != null) {
+                response.setVotoBranco(TipoVoto.BRANCO.equals(response.getTipoVoto()));
+                response.setVotoNulo(TipoVoto.NULO.equals(response.getTipoVoto()));
+            }
         }
     }
 }

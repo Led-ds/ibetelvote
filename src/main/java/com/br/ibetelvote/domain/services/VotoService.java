@@ -1,7 +1,11 @@
 package com.br.ibetelvote.domain.services;
 
+import com.br.ibetelvote.application.voto.dto.ValidarVotacaoResponse;
 import com.br.ibetelvote.application.voto.dto.VotarRequest;
+import com.br.ibetelvote.application.voto.dto.VotoFilterRequest;
 import com.br.ibetelvote.application.voto.dto.VotoResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Map;
@@ -19,6 +23,7 @@ public interface VotoService {
 
     // === CONSULTAS POR ELEIÇÃO ===
     List<VotoResponse> getVotosByEleicaoId(UUID eleicaoId);
+    Page<VotoResponse> getVotosByEleicaoPaginados(UUID eleicaoId, Pageable pageable);
     long getTotalVotosByEleicao(UUID eleicaoId);
 
     // === CONSULTAS POR CARGO PRETENDIDO ===
@@ -29,31 +34,29 @@ public interface VotoService {
     List<VotoResponse> getVotosByCandidatoId(UUID candidatoId);
     long getTotalVotosByCandidato(UUID candidatoId);
 
-    // === MÉTODOS DE COMPATIBILIDADE (DEPRECATED) ===
-    @Deprecated
-    List<VotoResponse> getVotosByCargoId(UUID cargoId);
-    @Deprecated
-    long getTotalVotosByCargo(UUID cargoId);
-
     // === RELATÓRIOS E ESTATÍSTICAS ===
     Map<String, Long> getEstatisticasVotacao(UUID eleicaoId);
     Map<String, Long> getEstatisticasPorCargo(UUID cargoPretendidoId);
     List<Map<String, Object>> getResultadosPorCandidato(UUID eleicaoId);
+    List<Map<String, Object>> getRankingCandidatosPorCargo(UUID eleicaoId, UUID cargoPretendidoId);
     List<Map<String, Object>> getProgressoVotacaoPorHora(UUID eleicaoId);
+    Map<String, Object> getResumoVotacaoDetalhado(UUID eleicaoId);
 
-    // === VALIDAÇÕES ===
+    // === VALIDAÇÕES MELHORADAS ===
     boolean isEleicaoDisponivelParaVotacao(UUID eleicaoId);
     boolean isMembroElegivelParaVotar(UUID membroId);
+    ValidarVotacaoResponse validarVotacaoCompleta(UUID membroId, VotarRequest request);
     List<String> validarVotacao(UUID membroId, VotarRequest request);
 
-    // === AUDITORIA ===
+    // === AUDITORIA E SEGURANÇA ===
     long getTotalVotosValidos();
     long getTotalVotosBranco();
     long getTotalVotosNulo();
-    List<VotoResponse> getVotosParaAuditoria(UUID eleicaoId); // Sem dados sensíveis
-
-    // === NOVOS MÉTODOS PARA ANÁLISE AVANÇADA ===
-    Map<String, Object> getResumoVotacaoDetalhado(UUID eleicaoId);
-    List<Map<String, Object>> getRankingCandidatosPorCargo(UUID eleicaoId, UUID cargoPretendidoId);
+    List<VotoResponse> getVotosParaAuditoria(UUID eleicaoId);
     Map<String, Object> getAnaliseSeguranca(UUID eleicaoId);
+
+    // === MÉTODOS NOVOS ===
+    Page<VotoResponse> buscarVotosComFiltros(VotoFilterRequest filtros, Pageable pageable);
+    boolean validarIntegridadeVotacao(UUID eleicaoId);
+    Map<String, Object> getMetricasTempoReal(UUID eleicaoId);
 }

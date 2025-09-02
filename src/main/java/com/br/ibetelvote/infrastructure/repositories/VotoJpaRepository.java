@@ -1,10 +1,13 @@
 package com.br.ibetelvote.infrastructure.repositories;
 
+import com.br.ibetelvote.application.voto.dto.VotoFilterRequest;
 import com.br.ibetelvote.domain.entities.Voto;
+import com.br.ibetelvote.domain.entities.enums.TipoVoto;
 import com.br.ibetelvote.domain.repositories.VotoRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -15,309 +18,435 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface VotoJpaRepository extends JpaRepository<Voto, UUID>, VotoRepository {
+public interface VotoJpaRepository extends JpaRepository<Voto, UUID>,
+        VotoRepository,
+        JpaSpecificationExecutor<Voto> {
 
-    // === OPERAÇÕES BÁSICAS ===
-    // Métodos básicos herdados do JpaRepository
+    // === OPERAÇÕES BÁSICAS OTIMIZADAS ===
 
-    // === CONSULTAS POR ELEIÇÃO ===
-    List<Voto> findByEleicaoId(UUID eleicaoId);
-    Page<Voto> findByEleicaoId(UUID eleicaoId, Pageable pageable);
-    long countByEleicaoId(UUID eleicaoId);
-    List<Voto> findByEleicaoIdOrderByDataVotoAsc(UUID eleicaoId);
+    /**
+     * Busca votos por eleição com fetch join das entidades relacionadas
+     */
+    @Query("SELECT v FROM Voto v " +
+            "LEFT JOIN FETCH v.membro m " +
+            "LEFT JOIN FETCH v.eleicao e " +
+            "LEFT JOIN FETCH v.cargoPretendido cp " +
+            "LEFT JOIN FETCH v.candidato c " +
+            "WHERE v.eleicao.id = :eleicaoId " +
+            "ORDER BY v.dataVoto DESC")
+    List<Voto> findByEleicaoIdWithEntities(@Param("eleicaoId") UUID eleicaoId);
 
-    // === CONSULTAS POR CARGO PRETENDIDO ===
-    List<Voto> findByCargoPretendidoId(UUID cargoPretendidoId);
-    Page<Voto> findByCargoPretendidoId(UUID cargoPretendidoId, Pageable pageable);
-    long countByCargoPretendidoId(UUID cargoPretendidoId);
-    List<Voto> findByEleicaoIdAndCargoPretendidoId(UUID eleicaoId, UUID cargoPretendidoId);
+    /**
+     * Busca votos por eleição com paginação e fetch join
+     */
+    @Query(value = "SELECT v FROM Voto v " +
+            "LEFT JOIN FETCH v.membro m " +
+            "LEFT JOIN FETCH v.eleicao e " +
+            "LEFT JOIN FETCH v.cargoPretendido cp " +
+            "LEFT JOIN FETCH v.candidato c " +
+            "WHERE v.eleicao.id = :eleicaoId",
+            countQuery = "SELECT COUNT(v) FROM Voto v WHERE v.eleicao.id = :eleicaoId")
+    Page<Voto> findByEleicaoIdWithEntities(@Param("eleicaoId") UUID eleicaoId, Pageable pageable);
 
-    // === CONSULTAS POR CANDIDATO ===
-    List<Voto> findByCandidatoId(UUID candidatoId);
-    Page<Voto> findByCandidatoId(UUID candidatoId, Pageable pageable);
-    long countByCandidatoId(UUID candidatoId);
-    List<Voto> findByCandidatoIdOrderByDataVotoAsc(UUID candidatoId);
+    /**
+     * Busca votos por membro com fetch join
+     */
+    @Query("SELECT v FROM Voto v " +
+            "LEFT JOIN FETCH v.membro m " +
+            "LEFT JOIN FETCH v.eleicao e " +
+            "LEFT JOIN FETCH v.cargoPretendido cp " +
+            "LEFT JOIN FETCH v.candidato c " +
+            "WHERE v.membro.id = :membroId " +
+            "ORDER BY v.dataVoto DESC")
+    List<Voto> findByMembroIdWithEntities(@Param("membroId") UUID membroId);
 
-    // === CONSULTAS POR MEMBRO ===
-    List<Voto> findByMembroId(UUID membroId);
-    Page<Voto> findByMembroId(UUID membroId, Pageable pageable);
-    long countByMembroId(UUID membroId);
-    List<Voto> findByEleicaoIdAndMembroId(UUID eleicaoId, UUID membroId);
+    /**
+     * Busca votos por cargo pretendido com fetch join
+     */
+    @Query("SELECT v FROM Voto v " +
+            "LEFT JOIN FETCH v.membro m " +
+            "LEFT JOIN FETCH v.eleicao e " +
+            "LEFT JOIN FETCH v.cargoPretendido cp " +
+            "LEFT JOIN FETCH v.candidato c " +
+            "WHERE v.cargoPretendido.id = :cargoPretendidoId " +
+            "ORDER BY v.dataVoto DESC")
+    List<Voto> findByCargoPretendidoIdWithEntities(@Param("cargoPretendidoId") UUID cargoPretendidoId);
 
-    // === VALIDAÇÕES DE VOTO ÚNICO ===
-    Optional<Voto> findByMembroIdAndCargoPretendidoIdAndEleicaoId(UUID membroId, UUID cargoPretendidoId, UUID eleicaoId);
-    boolean existsByMembroIdAndCargoPretendidoIdAndEleicaoId(UUID membroId, UUID cargoPretendidoId, UUID eleicaoId);
+    /**
+     * Busca votos por candidato com fetch join
+     */
+    @Query("SELECT v FROM Voto v " +
+            "LEFT JOIN FETCH v.membro m " +
+            "LEFT JOIN FETCH v.eleicao e " +
+            "LEFT JOIN FETCH v.cargoPretendido cp " +
+            "LEFT JOIN FETCH v.candidato c " +
+            "WHERE v.candidato.id = :candidatoId " +
+            "ORDER BY v.dataVoto DESC")
+    List<Voto> findByCandidatoIdWithEntities(@Param("candidatoId") UUID candidatoId);
+
+    /**
+     * Busca votos para auditoria (sem dados sensíveis) com fetch join
+     */
+    @Query("SELECT v FROM Voto v " +
+            "LEFT JOIN FETCH v.eleicao e " +
+            "LEFT JOIN FETCH v.cargoPretendido cp " +
+            "LEFT JOIN FETCH v.candidato c " +
+            "WHERE v.eleicao.id = :eleicaoId " +
+            "ORDER BY v.dataVoto")
+    List<Voto> findByEleicaoIdWithEntitiesForAudit(@Param("eleicaoId") UUID eleicaoId);
+
+    // === CONSULTAS BASEADAS EM RELACIONAMENTOS ===
+
+    /**
+     * Verifica se membro já votou na eleição
+     */
     boolean existsByMembroIdAndEleicaoId(UUID membroId, UUID eleicaoId);
 
-    // === CONSULTAS POR TIPO DE VOTO ===
-    List<Voto> findByVotoBrancoTrue();
-    List<Voto> findByVotoNuloTrue();
-    List<Voto> findByEleicaoIdAndVotoBrancoTrue(UUID eleicaoId);
-    List<Voto> findByEleicaoIdAndVotoNuloTrue(UUID eleicaoId);
-
-    // === CONSULTAS POR CARGO E TIPO ===
-    List<Voto> findByCargoPretendidoIdAndVotoBrancoTrue(UUID cargoPretendidoId);
-    List<Voto> findByCargoPretendidoIdAndVotoNuloTrue(UUID cargoPretendidoId);
-
-    // === CONSULTAS POR PERÍODO ===
-    List<Voto> findByDataVotoBetween(LocalDateTime inicio, LocalDateTime fim);
-    List<Voto> findByEleicaoIdAndDataVotoBetween(UUID eleicaoId, LocalDateTime inicio, LocalDateTime fim);
-    Page<Voto> findByDataVotoBetween(LocalDateTime inicio, LocalDateTime fim, Pageable pageable);
-
-    // === ESTATÍSTICAS GERAIS ===
-    long countByVotoBrancoTrue();
-    long countByVotoNuloTrue();
-
-    // === ESTATÍSTICAS POR ELEIÇÃO ===
-    long countByEleicaoIdAndVotoBrancoTrue(UUID eleicaoId);
-    long countByEleicaoIdAndVotoNuloTrue(UUID eleicaoId);
-
-    // === ESTATÍSTICAS POR CARGO PRETENDIDO ===
-    long countByCargoPretendidoIdAndVotoBrancoTrue(UUID cargoPretendidoId);
-    long countByCargoPretendidoIdAndVotoNuloTrue(UUID cargoPretendidoId);
-
-    // === CONSULTAS CUSTOMIZADAS COM @Query ===
+    /**
+     * Verifica se membro já votou no cargo específico da eleição
+     */
+    boolean existsByMembroIdAndCargoPretendidoIdAndEleicaoId(UUID membroId, UUID cargoPretendidoId, UUID eleicaoId);
 
     /**
-     * Busca votos válidos (têm candidato e não são branco/nulo)
+     * Busca voto específico por membro, cargo e eleição
      */
-    @Query("SELECT v FROM Voto v WHERE v.candidatoId IS NOT NULL AND v.votoBranco = false AND v.votoNulo = false")
-    List<Voto> findVotosValidos();
+    Optional<Voto> findByMembroIdAndCargoPretendidoIdAndEleicaoId(UUID membroId, UUID cargoPretendidoId, UUID eleicaoId);
+
+    // === CONSULTAS POR TIPO DE VOTO (ENUM) ===
 
     /**
-     * Busca votos válidos por eleição
+     * Busca votos por tipo usando enum
      */
-    @Query("SELECT v FROM Voto v WHERE v.eleicaoId = :eleicaoId AND v.candidatoId IS NOT NULL AND v.votoBranco = false AND v.votoNulo = false")
-    List<Voto> findVotosValidosByEleicao(@Param("eleicaoId") UUID eleicaoId);
+    List<Voto> findByTipoVoto(TipoVoto tipoVoto);
 
     /**
-     * Busca votos válidos por cargo pretendido
+     * Conta votos por tipo usando enum
      */
-    @Query("SELECT v FROM Voto v WHERE v.cargoPretendidoId = :cargoPretendidoId AND v.candidatoId IS NOT NULL AND v.votoBranco = false AND v.votoNulo = false")
-    List<Voto> findVotosValidosByCargoPretendido(@Param("cargoPretendidoId") UUID cargoPretendidoId);
+    long countByTipoVoto(TipoVoto tipoVoto);
 
     /**
-     * Conta votos válidos
+     * Busca votos por eleição e tipo
      */
-    @Query("SELECT COUNT(v) FROM Voto v WHERE v.candidatoId IS NOT NULL AND v.votoBranco = false AND v.votoNulo = false")
-    long countVotosValidos();
+    List<Voto> findByEleicaoIdAndTipoVoto(UUID eleicaoId, TipoVoto tipoVoto);
 
     /**
-     * Conta votos válidos por eleição
+     * Conta votos por eleição e tipo
      */
-    @Query("SELECT COUNT(v) FROM Voto v WHERE v.eleicaoId = :eleicaoId AND v.candidatoId IS NOT NULL AND v.votoBranco = false AND v.votoNulo = false")
-    long countVotosValidosByEleicao(@Param("eleicaoId") UUID eleicaoId);
+    long countByEleicaoIdAndTipoVoto(UUID eleicaoId, TipoVoto tipoVoto);
 
     /**
-     * Conta votos válidos por cargo pretendido
+     * Busca votos por cargo pretendido e tipo
      */
-    @Query("SELECT COUNT(v) FROM Voto v WHERE v.cargoPretendidoId = :cargoPretendidoId AND v.candidatoId IS NOT NULL AND v.votoBranco = false AND v.votoNulo = false")
-    long countVotosValidosByCargoPretendido(@Param("cargoPretendidoId") UUID cargoPretendidoId);
-
-    // === RELATÓRIOS E CONSULTAS CUSTOMIZADAS ===
+    List<Voto> findByCargoPretendidoIdAndTipoVoto(UUID cargoPretendidoId, TipoVoto tipoVoto);
 
     /**
-     * Conta votos por candidato em uma eleição específica
+     * Conta votos por cargo pretendido e tipo
      */
-    @Query("SELECT c.nomeCandidato, cp.nome, COUNT(v) FROM Voto v " +
-            "JOIN Candidato c ON v.candidatoId = c.id " +
-            "JOIN Cargo cp ON v.cargoPretendidoId = cp.id " +
-            "WHERE v.eleicaoId = :eleicaoId AND v.candidatoId IS NOT NULL " +
-            "GROUP BY c.id, c.nomeCandidato, cp.id, cp.nome " +
-            "ORDER BY cp.nome, COUNT(v) DESC")
-    List<Object[]> countVotosByCandidatoAndCargoPretendido(@Param("eleicaoId") UUID eleicaoId);
+    long countByCargoPretendidoIdAndTipoVoto(UUID cargoPretendidoId, TipoVoto tipoVoto);
+
+    // === CONSULTAS BÁSICAS POR ENTIDADE ===
 
     /**
-     * Conta votos por hora em uma eleição
+     * Conta votos por eleição
      */
-    @Query("SELECT HOUR(v.dataVoto), COUNT(v) FROM Voto v " +
-            "WHERE v.eleicaoId = :eleicaoId " +
-            "GROUP BY HOUR(v.dataVoto) " +
-            "ORDER BY HOUR(v.dataVoto)")
-    List<Object[]> countVotosByHora(@Param("eleicaoId") UUID eleicaoId);
+    long countByEleicaoId(UUID eleicaoId);
 
     /**
-     * Busca ranking de candidatos por número de votos
+     * Conta votos por cargo pretendido
      */
-    @Query("SELECT c.nomeCandidato, c.numeroCandidato, COUNT(v) as totalVotos FROM Voto v " +
-            "JOIN Candidato c ON v.candidatoId = c.id " +
-            "WHERE v.eleicaoId = :eleicaoId AND v.cargoPretendidoId = :cargoPretendidoId AND v.candidatoId IS NOT NULL " +
-            "GROUP BY c.id, c.nomeCandidato, c.numeroCandidato " +
-            "ORDER BY totalVotos DESC, c.nomeCandidato ASC")
+    long countByCargoPretendidoId(UUID cargoPretendidoId);
+
+    /**
+     * Conta votos por candidato
+     */
+    long countByCandidatoId(UUID candidatoId);
+
+    /**
+     * Conta membros únicos que votaram na eleição
+     */
+    @Query("SELECT COUNT(DISTINCT v.membro.id) FROM Voto v WHERE v.eleicao.id = :eleicaoId")
+    long countDistinctMembroByEleicaoId(@Param("eleicaoId") UUID eleicaoId);
+
+    // === CONSULTAS PARA RELATÓRIOS E ESTATÍSTICAS ===
+
+    /**
+     * Conta votos por candidato e cargo em uma eleição
+     */
+    @Query("SELECT v.candidato.id, v.candidato.nomeCandidato, v.cargoPretendido.id, " +
+            "v.cargoPretendido.nome, COUNT(v) " +
+            "FROM Voto v " +
+            "WHERE v.eleicao.id = :eleicaoId AND v.tipoVoto = 'CANDIDATO' " +
+            "GROUP BY v.candidato.id, v.candidato.nomeCandidato, " +
+            "v.cargoPretendido.id, v.cargoPretendido.nome " +
+            "ORDER BY v.cargoPretendido.nome, COUNT(v) DESC")
+    List<Object[]> countVotosByCandidatoAndCargo(@Param("eleicaoId") UUID eleicaoId);
+
+    /**
+     * Ranking de candidatos por cargo com percentuais
+     */
+    @Query("SELECT v.candidato.id, v.candidato.nomeCandidato, v.candidato.numeroCandidato, " +
+            "COUNT(v) as totalVotos, " +
+            "(COUNT(v) * 100.0 / (SELECT COUNT(v2) FROM Voto v2 " +
+            "WHERE v2.eleicao.id = :eleicaoId AND v2.cargoPretendido.id = :cargoPretendidoId)) as percentual " +
+            "FROM Voto v " +
+            "WHERE v.eleicao.id = :eleicaoId AND v.cargoPretendido.id = :cargoPretendidoId " +
+            "AND v.tipoVoto = 'CANDIDATO' " +
+            "GROUP BY v.candidato.id, v.candidato.nomeCandidato, v.candidato.numeroCandidato " +
+            "ORDER BY totalVotos DESC, v.candidato.nomeCandidato")
     List<Object[]> findRankingCandidatosPorVotos(@Param("eleicaoId") UUID eleicaoId,
                                                  @Param("cargoPretendidoId") UUID cargoPretendidoId);
 
     /**
-     * Busca distribuição de votos por tipo
+     * Progresso de votação por hora com votos acumulados
      */
-    @Query("SELECT " +
-            "SUM(CASE WHEN v.candidatoId IS NOT NULL AND v.votoBranco = false AND v.votoNulo = false THEN 1 ELSE 0 END) as votosValidos, " +
-            "SUM(CASE WHEN v.votoBranco = true THEN 1 ELSE 0 END) as votosBranco, " +
-            "SUM(CASE WHEN v.votoNulo = true THEN 1 ELSE 0 END) as votosNulo, " +
-            "COUNT(v) as totalVotos " +
-            "FROM Voto v WHERE v.eleicaoId = :eleicaoId")
-    List<Object[]> findDistribuicaoVotosPorTipo(@Param("eleicaoId") UUID eleicaoId);
-
-    /**
-     * Busca progresso da votação ao longo do tempo
-     */
-    @Query("SELECT DATE(v.dataVoto), HOUR(v.dataVoto), COUNT(v) FROM Voto v " +
-            "WHERE v.eleicaoId = :eleicaoId " +
-            "GROUP BY DATE(v.dataVoto), HOUR(v.dataVoto) " +
-            "ORDER BY DATE(v.dataVoto), HOUR(v.dataVoto)")
-    List<Object[]> findProgressoVotacao(@Param("eleicaoId") UUID eleicaoId);
-
-    /**
-     * Conta votantes únicos por eleição
-     */
-    @Query("SELECT COUNT(DISTINCT v.membroId) FROM Voto v WHERE v.eleicaoId = :eleicaoId")
-    long countVotantesUnicosByEleicao(@Param("eleicaoId") UUID eleicaoId);
-
-    /**
-     * Busca últimos votos registrados
-     */
-    @Query("SELECT v FROM Voto v ORDER BY v.dataVoto DESC")
-    List<Voto> findUltimosVotosRegistrados(@Param("limite") int limite);
-
-    /**
-     * Busca votos por range de hash (para auditoria)
-     */
-    @Query("SELECT v FROM Voto v WHERE v.hashVoto LIKE %:hashFragment%")
-    List<Voto> findByHashVotoContaining(@Param("hashFragment") String hashFragment);
-
-    /**
-     * Busca votos com dados incompletos (para limpeza)
-     */
-    @Query("SELECT v FROM Voto v WHERE v.hashVoto IS NULL OR v.ipOrigem IS NULL OR v.userAgent IS NULL")
-    List<Voto> findVotosComDadosIncompletos();
-
-    /**
-     * Busca votos por IP de origem (para análise de segurança)
-     */
-    @Query("SELECT v FROM Voto v WHERE v.ipOrigem LIKE %:ipPattern%")
-    List<Voto> findByIpOrigemContaining(@Param("ipPattern") String ipPattern);
-
-    // === CONSULTAS PARA AUDITORIA ===
-
-    /**
-     * Busca votos para auditoria (sem dados sensíveis)
-     */
-    @Query("SELECT v FROM Voto v WHERE v.eleicaoId = :eleicaoId ORDER BY v.dataVoto")
-    List<Voto> findVotosParaAuditoria(@Param("eleicaoId") UUID eleicaoId);
-
-    /**
-     * Conta total de votantes distintos por eleição
-     */
-    @Query("SELECT COUNT(DISTINCT v.membroId) FROM Voto v WHERE v.eleicaoId = :eleicaoId")
-    long countDistinctMembroByEleicaoId(@Param("eleicaoId") UUID eleicaoId);
-
-    /**
-     * Verifica integridade dos votos por hash
-     */
-    @Query("SELECT v FROM Voto v WHERE v.hashVoto IN (" +
-            "SELECT v2.hashVoto FROM Voto v2 GROUP BY v2.hashVoto HAVING COUNT(v2.hashVoto) > 1)")
-    List<Voto> findVotosComHashDuplicado();
-
-    /**
-     * Busca votos suspeitos (mesmo IP, user agent, etc.)
-     */
-    @Query("SELECT v.ipOrigem, v.userAgent, COUNT(v) FROM Voto v " +
-            "WHERE v.eleicaoId = :eleicaoId " +
-            "GROUP BY v.ipOrigem, v.userAgent " +
-            "HAVING COUNT(v) > 5 " +
-            "ORDER BY COUNT(v) DESC")
-    List<Object[]> findVotosSuspeitos(@Param("eleicaoId") UUID eleicaoId);
-
-    // === CONSULTAS ESPECÍFICAS PARA RELATÓRIOS ===
-
-    /**
-     * Busca resumo de votação por cargo pretendido
-     */
-    @Query("SELECT cp.nome, " +
-            "COUNT(v) as totalVotos, " +
-            "SUM(CASE WHEN v.candidatoId IS NOT NULL AND v.votoBranco = false AND v.votoNulo = false THEN 1 ELSE 0 END) as votosValidos, " +
-            "SUM(CASE WHEN v.votoBranco = true THEN 1 ELSE 0 END) as votosBranco, " +
-            "SUM(CASE WHEN v.votoNulo = true THEN 1 ELSE 0 END) as votosNulo " +
-            "FROM Voto v JOIN Cargo cp ON v.cargoPretendidoId = cp.id " +
-            "WHERE v.eleicaoId = :eleicaoId " +
-            "GROUP BY cp.id, cp.nome " +
-            "ORDER BY cp.nome")
-    List<Object[]> getResumoVotacaoPorCargo(@Param("eleicaoId") UUID eleicaoId);
-
-    /**
-     * Busca participação por cargo atual do membro
-     */
-    @Query("SELECT COALESCE(c.nome, 'Sem Cargo'), COUNT(DISTINCT v.membroId) " +
+    @Query("SELECT HOUR(v.dataVoto) as hora, COUNT(v) as votosPorHora, " +
+            "(SELECT COUNT(v2) FROM Voto v2 WHERE v2.eleicao.id = :eleicaoId " +
+            "AND v2.dataVoto <= v.dataVoto) as votosAcumulados " +
             "FROM Voto v " +
-            "JOIN Membro m ON v.membroId = m.id " +
-            "LEFT JOIN Cargo c ON m.cargoAtualId = c.id " +
-            "WHERE v.eleicaoId = :eleicaoId " +
-            "GROUP BY m.cargoAtualId, c.nome " +
-            "ORDER BY c.nome NULLS LAST")
+            "WHERE v.eleicao.id = :eleicaoId " +
+            "GROUP BY HOUR(v.dataVoto) " +
+            "ORDER BY hora")
+    List<Object[]> countVotosByHora(@Param("eleicaoId") UUID eleicaoId);
+
+    /**
+     * Participação por cargo atual do membro com percentuais
+     */
+    @Query("SELECT COALESCE(v.membro.cargoAtual.nome, 'Sem Cargo') as cargoMembro, " +
+            "COUNT(DISTINCT v.membro.id) as quantidadeVotantes, " +
+            "(COUNT(DISTINCT v.membro.id) * 100.0 / " +
+            "(SELECT COUNT(DISTINCT v2.membro.id) FROM Voto v2 WHERE v2.eleicao.id = :eleicaoId)) as percentual " +
+            "FROM Voto v " +
+            "WHERE v.eleicao.id = :eleicaoId " +
+            "GROUP BY v.membro.cargoAtual.id, v.membro.cargoAtual.nome " +
+            "ORDER BY quantidadeVotantes DESC")
     List<Object[]> getParticipacaoPorCargoMembro(@Param("eleicaoId") UUID eleicaoId);
 
-    /**
-     * Busca tendências de votação por período
-     */
-    @Query("SELECT DATE(v.dataVoto), COUNT(v) FROM Voto v " +
-            "WHERE v.eleicaoId = :eleicaoId AND v.dataVoto BETWEEN :inicio AND :fim " +
-            "GROUP BY DATE(v.dataVoto) " +
-            "ORDER BY DATE(v.dataVoto)")
-    List<Object[]> getTendenciasVotacaoPorPeriodo(@Param("eleicaoId") UUID eleicaoId,
-                                                  @Param("inicio") LocalDateTime inicio,
-                                                  @Param("fim") LocalDateTime fim);
-
-    // === MÉTODOS DE VALIDAÇÃO E SEGURANÇA ===
+    // === CONSULTAS PARA MÉTRICAS EM TEMPO REAL ===
 
     /**
-     * Verifica se existe voto duplicado para o mesmo candidato
+     * Conta votos do último minuto
      */
-    @Query("SELECT CASE WHEN COUNT(v) > 0 THEN true ELSE false END FROM Voto v " +
-            "WHERE v.membroId = :membroId AND v.candidatoId = :candidatoId AND v.eleicaoId = :eleicaoId")
-    boolean existsVotoDuplicado(@Param("membroId") UUID membroId,
-                                @Param("candidatoId") UUID candidatoId,
-                                @Param("eleicaoId") UUID eleicaoId);
+    @Query("SELECT COUNT(v) FROM Voto v " +
+            "WHERE v.eleicao.id = :eleicaoId " +
+            "AND v.dataVoto >= :umMinutoAtras")
+    long countVotosUltimoMinuto(@Param("eleicaoId") UUID eleicaoId,
+                                @Param("umMinutoAtras") LocalDateTime umMinutoAtras);
 
     /**
-     * Conta votos por IP para detectar possíveis irregularidades
+     * Conta votos da última hora
      */
-    @Query("SELECT v.ipOrigem, COUNT(v) FROM Voto v " +
-            "WHERE v.eleicaoId = :eleicaoId " +
+    @Query("SELECT COUNT(v) FROM Voto v " +
+            "WHERE v.eleicao.id = :eleicaoId " +
+            "AND v.dataVoto >= :umaHoraAtras")
+    long countVotosUltimaHora(@Param("eleicaoId") UUID eleicaoId,
+                              @Param("umaHoraAtras") LocalDateTime umaHoraAtras);
+
+    /**
+     * Calcula velocidade de votação (votos por minuto)
+     */
+    @Query("SELECT COUNT(v) / " +
+            "GREATEST(1, EXTRACT(EPOCH FROM (MAX(v.dataVoto) - MIN(v.dataVoto))) / 60) " +
+            "FROM Voto v WHERE v.eleicao.id = :eleicaoId")
+    Double getVelocidadeVotacao(@Param("eleicaoId") UUID eleicaoId);
+
+    /**
+     * Calcula tempo médio entre votos
+     */
+    @Query("SELECT AVG(EXTRACT(EPOCH FROM (v2.dataVoto - v1.dataVoto))) " +
+            "FROM Voto v1, Voto v2 " +
+            "WHERE v1.eleicao.id = :eleicaoId AND v2.eleicao.id = :eleicaoId " +
+            "AND v2.dataVoto > v1.dataVoto " +
+            "AND NOT EXISTS (SELECT v3 FROM Voto v3 WHERE v3.eleicao.id = :eleicaoId " +
+            "AND v3.dataVoto > v1.dataVoto AND v3.dataVoto < v2.dataVoto)")
+    Double getTempoMedioEntreVotos(@Param("eleicaoId") UUID eleicaoId);
+
+    // === CONSULTAS PARA SEGURANÇA E AUDITORIA ===
+
+    /**
+     * Busca votos suspeitos por IP
+     */
+    @Query("SELECT v.ipOrigem, COUNT(v) as totalVotos, " +
+            "AVG(EXTRACT(EPOCH FROM (v.dataVoto - " +
+            "(SELECT MIN(v2.dataVoto) FROM Voto v2 WHERE v2.ipOrigem = v.ipOrigem " +
+            "AND v2.eleicao.id = :eleicaoId)))) as tempoMedio " +
+            "FROM Voto v " +
+            "WHERE v.eleicao.id = :eleicaoId AND v.ipOrigem IS NOT NULL " +
             "GROUP BY v.ipOrigem " +
-            "HAVING COUNT(v) > 3 " +
+            "HAVING COUNT(v) > 5 " +
+            "ORDER BY totalVotos DESC")
+    List<Object[]> findVotosSuspeitos(@Param("eleicaoId") UUID eleicaoId);
+
+    /**
+     * Conta hash duplicados
+     */
+    @Query("SELECT COUNT(v) FROM Voto v " +
+            "WHERE v.eleicao.id = :eleicaoId " +
+            "AND v.hashVoto IN (" +
+            "SELECT v2.hashVoto FROM Voto v2 " +
+            "WHERE v2.eleicao.id = :eleicaoId " +
+            "GROUP BY v2.hashVoto HAVING COUNT(v2) > 1)")
+    int countHashDuplicados(@Param("eleicaoId") UUID eleicaoId);
+
+    /**
+     * Busca padrões temporais suspeitos
+     */
+    @Query("SELECT CONCAT(HOUR(v.dataVoto), ':', MINUTE(v.dataVoto)) as intervalo, " +
+            "COUNT(v) as votosRapidos " +
+            "FROM Voto v " +
+            "WHERE v.eleicao.id = :eleicaoId " +
+            "GROUP BY HOUR(v.dataVoto), MINUTE(v.dataVoto) " +
+            "HAVING COUNT(v) > 20 " +
+            "ORDER BY votosRapidos DESC")
+    List<Object[]> findPadroesTemporaisSuspeitos(@Param("eleicaoId") UUID eleicaoId);
+
+    /**
+     * Distribuição de votos por IP
+     */
+    @Query("SELECT v.ipOrigem, COUNT(v) " +
+            "FROM Voto v " +
+            "WHERE v.eleicao.id = :eleicaoId AND v.ipOrigem IS NOT NULL " +
+            "GROUP BY v.ipOrigem " +
             "ORDER BY COUNT(v) DESC")
     List<Object[]> countVotosPorIpOrigem(@Param("eleicaoId") UUID eleicaoId);
 
+    // === CONSULTAS COM FILTROS DINÂMICOS ===
+
     /**
-     * Busca votos registrados muito próximos no tempo (possível automação)
+     * Busca votos com filtros usando Specification
      */
-    @Query(value = "SELECT * FROM votos v WHERE v.eleicao_id = :eleicaoId AND " +
-            "EXISTS (SELECT 1 FROM votos v2 WHERE v2.membro_id = v.membro_id AND v2.id != v.id AND " +
-            "ABS(EXTRACT(EPOCH FROM (v.created_at - v2.created_at))) <= :segundosIntervalo)",
-            nativeQuery = true)
-    List<Voto> findVotosSequenciaisRapidos(@Param("eleicaoId") UUID eleicaoId,
-                                           @Param("segundosIntervalo") int segundosIntervalo);
+    @Query("SELECT v FROM Voto v " +
+            "LEFT JOIN FETCH v.membro m " +
+            "LEFT JOIN FETCH v.eleicao e " +
+            "LEFT JOIN FETCH v.cargoPretendido cp " +
+            "LEFT JOIN FETCH v.candidato c " +
+            "WHERE (:#{#filtros.eleicaoId} IS NULL OR v.eleicao.id = :#{#filtros.eleicaoId}) " +
+            "AND (:#{#filtros.membroId} IS NULL OR v.membro.id = :#{#filtros.membroId}) " +
+            "AND (:#{#filtros.cargoPretendidoId} IS NULL OR v.cargoPretendido.id = :#{#filtros.cargoPretendidoId}) " +
+            "AND (:#{#filtros.candidatoId} IS NULL OR v.candidato.id = :#{#filtros.candidatoId}) " +
+            "AND (:#{#filtros.tipoVoto} IS NULL OR v.tipoVoto = :#{#filtros.tipoVoto}) " +
+            "AND (:#{#filtros.dataInicio} IS NULL OR v.dataVoto >= :#{#filtros.dataInicio}) " +
+            "AND (:#{#filtros.dataFim} IS NULL OR v.dataVoto <= :#{#filtros.dataFim}) " +
+            "AND (:#{#filtros.apenasVotosSeguro} = false OR (v.hashVoto IS NOT NULL AND v.ipOrigem IS NOT NULL))")
+    Page<Voto> findWithFilters(@Param("filtros") VotoFilterRequest filtros, Pageable pageable);
 
-    // === COMPATIBILIDADE TEMPORÁRIA ===
+    // === MÉTODOS UTILITÁRIOS ===
 
     /**
-     * @deprecated Usar findByCargoPretendidoId
+     * Busca votos com dados incompletos
+     */
+    @Query("SELECT v FROM Voto v " +
+            "WHERE v.hashVoto IS NULL OR v.ipOrigem IS NULL OR v.userAgent IS NULL " +
+            "OR v.membro IS NULL OR v.eleicao IS NULL OR v.cargoPretendido IS NULL")
+    List<Voto> findVotosComDadosIncompletos();
+
+    /**
+     * Busca votos com hash duplicado
+     */
+    @Query("SELECT v FROM Voto v " +
+            "WHERE v.hashVoto IN (" +
+            "SELECT v2.hashVoto FROM Voto v2 " +
+            "WHERE v2.hashVoto IS NOT NULL " +
+            "GROUP BY v2.hashVoto HAVING COUNT(v2) > 1) " +
+            "ORDER BY v.hashVoto, v.dataVoto")
+    List<Voto> findVotosComHashDuplicado();
+
+    // === COMPATIBILIDADE COM ESTRUTURA ANTIGA ===
+
+    /**
+     * COMPATIBILIDADE: Busca por membroId (UUID)
+     */
+    @Query("SELECT v FROM Voto v WHERE v.membro.id = :membroId")
+    List<Voto> findByMembroId(@Param("membroId") UUID membroId);
+
+    /**
+     * COMPATIBILIDADE: Busca por eleicaoId (UUID)
+     */
+    @Query("SELECT v FROM Voto v WHERE v.eleicao.id = :eleicaoId")
+    List<Voto> findByEleicaoId(@Param("eleicaoId") UUID eleicaoId);
+
+    /**
+     * COMPATIBILIDADE: Busca por cargoPretendidoId (UUID)
+     */
+    @Query("SELECT v FROM Voto v WHERE v.cargoPretendido.id = :cargoPretendidoId")
+    List<Voto> findByCargoPretendidoId(@Param("cargoPretendidoId") UUID cargoPretendidoId);
+
+    /**
+     * COMPATIBILIDADE: Busca por candidatoId (UUID)
+     */
+    @Query("SELECT v FROM Voto v WHERE v.candidato.id = :candidatoId")
+    List<Voto> findByCandidatoId(@Param("candidatoId") UUID candidatoId);
+
+    // === ✅ QUERIES PARA MIGRAÇÃO DE DADOS CORRIGIDAS ===
+
+    /**
+     * ✅ MIGRAÇÃO CORRIGIDA: Busca votos que precisam migrar enum
+     * (votos que ainda não têm tipoVoto definido)
+     */
+    @Query("SELECT v FROM Voto v WHERE v.tipoVoto IS NULL")
+    List<Voto> findVotosParaMigracao();
+
+    /**
+     * ✅ MIGRAÇÃO: Busca votos que eram brancos na estrutura antiga
+     * (assumindo que existe campo temporário ou via candidatoId null)
+     */
+    @Query("SELECT v FROM Voto v WHERE v.tipoVoto IS NULL AND v.candidato IS NULL")
+    List<Voto> findVotosBrancosParaMigracao();
+
+    // === ✅ IMPLEMENTAÇÕES CORRETAS DOS MÉTODOS DEPRECATED ===
+
+    /**
+     * ✅ DEPRECATED CORRIGIDO: findByVotoBrancoTrue usando enum
      */
     @Deprecated
-    @Query("SELECT v FROM Voto v WHERE v.cargoPretendidoId = :cargoId")
-    List<Voto> findByCargoId(@Param("cargoId") UUID cargoId);
+    @Query("SELECT v FROM Voto v WHERE v.tipoVoto = 'BRANCO'")
+    List<Voto> findByVotoBrancoTrue();
 
     /**
-     * @deprecated Usar countByCargoPretendidoId
+     * ✅ DEPRECATED CORRIGIDO: findByVotoNuloTrue usando enum
      */
     @Deprecated
-    @Query("SELECT COUNT(v) FROM Voto v WHERE v.cargoPretendidoId = :cargoId")
-    long countByCargoId(@Param("cargoId") UUID cargoId);
+    @Query("SELECT v FROM Voto v WHERE v.tipoVoto = 'NULO'")
+    List<Voto> findByVotoNuloTrue();
 
     /**
-     * @deprecated Usar findByEleicaoIdAndCargoPretendidoId
+     * ✅ DEPRECATED CORRIGIDO: countByVotoBrancoTrue usando enum
      */
     @Deprecated
-    @Query("SELECT v FROM Voto v WHERE v.eleicaoId = :eleicaoId AND v.cargoPretendidoId = :cargoId")
-    List<Voto> findByEleicaoIdAndCargoId(@Param("eleicaoId") UUID eleicaoId, @Param("cargoId") UUID cargoId);
+    @Query("SELECT COUNT(v) FROM Voto v WHERE v.tipoVoto = 'BRANCO'")
+    long countByVotoBrancoTrue();
+
+    /**
+     * ✅ DEPRECATED CORRIGIDO: countByVotoNuloTrue usando enum
+     */
+    @Deprecated
+    @Query("SELECT COUNT(v) FROM Voto v WHERE v.tipoVoto = 'NULO'")
+    long countByVotoNuloTrue();
+
+    /**
+     * ✅ DEPRECATED CORRIGIDO: findByEleicaoIdAndVotoBrancoTrue usando enum
+     */
+    @Deprecated
+    @Query("SELECT v FROM Voto v WHERE v.eleicao.id = :eleicaoId AND v.tipoVoto = 'BRANCO'")
+    List<Voto> findByEleicaoIdAndVotoBrancoTrue(@Param("eleicaoId") UUID eleicaoId);
+
+    /**
+     * ✅ DEPRECATED CORRIGIDO: findByEleicaoIdAndVotoNuloTrue usando enum
+     */
+    @Deprecated
+    @Query("SELECT v FROM Voto v WHERE v.eleicao.id = :eleicaoId AND v.tipoVoto = 'NULO'")
+    List<Voto> findByEleicaoIdAndVotoNuloTrue(@Param("eleicaoId") UUID eleicaoId);
+
+    /**
+     * ✅ DEPRECATED CORRIGIDO: countByEleicaoIdAndVotoBrancoTrue usando enum
+     */
+    @Deprecated
+    @Query("SELECT COUNT(v) FROM Voto v WHERE v.eleicao.id = :eleicaoId AND v.tipoVoto = 'BRANCO'")
+    long countByEleicaoIdAndVotoBrancoTrue(@Param("eleicaoId") UUID eleicaoId);
+
+    /**
+     * ✅ DEPRECATED CORRIGIDO: countByEleicaoIdAndVotoNuloTrue usando enum
+     */
+    @Deprecated
+    @Query("SELECT COUNT(v) FROM Voto v WHERE v.eleicao.id = :eleicaoId AND v.tipoVoto = 'NULO'")
+    long countByEleicaoIdAndVotoNuloTrue(@Param("eleicaoId") UUID eleicaoId);
 }

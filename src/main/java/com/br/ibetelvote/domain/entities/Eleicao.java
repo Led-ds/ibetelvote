@@ -218,7 +218,7 @@ public class Eleicao {
      */
     public boolean membroJaVotou(UUID membroId) {
         return votos != null && votos.stream()
-                .anyMatch(voto -> voto.getMembroId().equals(membroId));
+                .anyMatch(voto -> voto.getMembro().getId().equals(membroId));
     }
 
     // === MÉTODOS UTILITÁRIOS ===

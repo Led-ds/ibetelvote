@@ -42,6 +42,14 @@ public interface MembroJpaRepository extends JpaRepository<Membro, UUID>, Membro
     @Query("SELECT m FROM Membro m WHERE UPPER(m.nome) LIKE UPPER(CONCAT('%', :nome, '%'))")
     List<Membro> findByNomeContainingIgnoreCase(@Param("nome") String nome);
 
+
+    @Query("SELECT COUNT(m) FROM Membro m WHERE m.ativo = true")
+    Long countMembrosAtivos();
+
+    @Query("SELECT COUNT(m) FROM Membro m WHERE m.ativo = true AND m.user IS NOT NULL")
+    Long countMembrosElegiveisParaVotacao();
+
+
     // === CONSULTAS POR CARGO ===
     List<Membro> findByCargoAtualId(UUID cargoId);
 

@@ -329,9 +329,9 @@ public class Candidato {
 
         // Contar total de votos válidos para o mesmo cargo na eleição
         long totalVotosValidosCargo = eleicao.getVotos().stream()
-                .filter(voto -> voto.getCandidatoId() != null)
+                .filter(voto -> voto.getCandidato() != null)
                 .filter(voto -> {
-                    if (voto.getCandidato() != null && voto.getCandidato().getCargoPretendidoId() != null) {
+                    if (voto.getCandidato().getCargoPretendidoId() != null) {
                         return voto.getCandidato().getCargoPretendidoId().equals(this.cargoPretendidoId);
                     }
                     return false;

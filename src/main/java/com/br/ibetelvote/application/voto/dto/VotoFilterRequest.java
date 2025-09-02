@@ -1,5 +1,6 @@
 package com.br.ibetelvote.application.voto.dto;
 
+import com.br.ibetelvote.domain.entities.enums.TipoVoto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,14 +19,21 @@ public class VotoFilterRequest {
     private UUID cargoPretendidoId;
     private UUID candidatoId;
     private UUID membroId;
+
+    private TipoVoto tipoVoto;
+
+    // Mantendo para compatibilidade
+    @Deprecated
     private Boolean votoBranco;
+    @Deprecated
     private Boolean votoNulo;
+
     private LocalDateTime dataInicio;
     private LocalDateTime dataFim;
-    private String tipoVoto; // "VALIDO", "BRANCO", "NULO"
     private boolean apenasVotosSeguro;
+    private boolean apenasComHash;
 
-    // === PAGINAÇÃO ===
+    // Paginação
     @Builder.Default
     private int page = 0;
 
@@ -37,4 +45,15 @@ public class VotoFilterRequest {
 
     @Builder.Default
     private String direction = "desc";
+
+    public boolean hasFilters() {
+        return eleicaoId != null || cargoPretendidoId != null ||
+                candidatoId != null || membroId != null ||
+                tipoVoto != null || dataInicio != null || dataFim != null;
+    }
+
+    public boolean isValidDateRange() {
+        if (dataInicio == null || dataFim == null) return true;
+        return dataInicio.isBefore(dataFim) || dataInicio.equals(dataFim);
+    }
 }
