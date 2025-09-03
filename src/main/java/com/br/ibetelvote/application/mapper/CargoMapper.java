@@ -30,7 +30,7 @@ public abstract class CargoMapper {
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "categoria", source = "categoriaId", qualifiedByName = "mapCategoria")
-    @Mapping(target = "elegibilidadeJson", ignore = true) // Será tratado no afterMapping
+    @Mapping(target = "elegibilidade", source = "elegibilidade") // Agora mapeia diretamente
     public abstract Cargo toEntity(CreateCargoRequest request);
 
     // === RESPONSE MAPPINGS ===
@@ -56,6 +56,7 @@ public abstract class CargoMapper {
     @Mapping(target = "podeSerRemovido", constant = "true") // Validação será no service
     @Mapping(target = "podeSerEditado", constant = "true") // Validação será no service
     @Mapping(target = "podeSerPromovido", expression = "java(cargo.getProximaHierarquiaSugerida() != null)")
+    @Mapping(target = "elegibilidade", source = "elegibilidade") // Mapeia diretamente a lista
     public abstract CargoResponse toResponse(Cargo cargo);
 
     /**
@@ -75,7 +76,7 @@ public abstract class CargoMapper {
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "categoria", source = "categoriaId", qualifiedByName = "mapCategoria")
-    @Mapping(target = "elegibilidadeJson", ignore = true) // Será tratado no afterMapping
+    @Mapping(target = "elegibilidade", source = "elegibilidade") // Agora mapeia diretamente
     public abstract void updateEntityFromRequest(UpdateCargoRequest request, @MappingTarget Cargo cargo);
 
     // === BASIC INFO MAPPING ===
@@ -157,8 +158,8 @@ public abstract class CargoMapper {
             throw new IllegalArgumentException("Nome do cargo inválido: " + cargo.getNome());
         }
 
-        // Definir elegibilidade via setter que converte para JSON
-        if (request.getElegibilidade() != null) {
+        // A elegibilidade já foi mapeada diretamente, mas garantir que não seja null
+        if (cargo.getElegibilidade() == null) {
             cargo.setElegibilidade(request.getElegibilidade());
         }
 
@@ -167,6 +168,37 @@ public abstract class CargoMapper {
             if (!request.podeSerDisponibilizadoParaEleicoes()) {
                 throw new IllegalArgumentException("Cargo não possui informações suficientes para ser disponibilizado para eleições");
             }
+        }
+    }
+
+    /**
+     * Processa dados após o mapeamento de atualização
+     */
+    @AfterMapping
+    public void afterUpdateMapping(@MappingTarget Cargo cargo, UpdateCargoRequest request) {
+        // Garantir que o cargo tenha nome válido se foi alterado
+        if (request.getNome() != null && !Cargo.isNomeValido(cargo.getNome())) {
+            throw new IllegalArgumentException("Nome do cargo inválido: " + cargo.getNome());
+        }
+
+        // Garantir que elegibilidade não seja null após atualização
+        if (cargo.getElegibilidade() == null) {
+            cargo.setElegibilidade(request.getElegibilidade());
+        }
+
+        // Validar requisitos se foram alterados
+        if (request.getRequisitosCargo() != null && !Cargo.isRequisitosValido(request.getRequisitosCargo())) {
+            throw new IllegalArgumentException("Requisitos do cargo são muito longos (máximo 2000 caracteres)");
+        }
+
+        // Validar ordem de precedência se foi alterada
+        if (request.getOrdemPrecedencia() != null && !Cargo.isOrdemPrecedenciaValida(request.getOrdemPrecedencia())) {
+            throw new IllegalArgumentException("Ordem de precedência deve ser um número positivo");
+        }
+
+        // Validar elegibilidade se foi alterada
+        if (request.getElegibilidade() != null && !Cargo.isElegibilidadeValida(request.getElegibilidade())) {
+            throw new IllegalArgumentException("Lista de elegibilidade contém valores inválidos ou duplicados");
         }
     }
 }

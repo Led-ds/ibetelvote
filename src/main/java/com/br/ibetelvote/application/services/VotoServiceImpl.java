@@ -619,9 +619,9 @@ public class VotoServiceImpl implements VotoService {
         return padroes.stream()
                 .map(item -> {
                     Map<String, Object> padrao = new HashMap<>();
-                    padrao.put("intervalo", item[0]);
+                    padrao.put("hora", item[0]);
                     padrao.put("votosRapidos", item[1]);
-                    padrao.put("flagSuspeito", ((Long) item[1]) > 50); // Mais de 50 votos em menos de 1 minuto
+                    padrao.put("flagSuspeito", ((Long) item[1]) > 50);
                     return padrao;
                 })
                 .collect(Collectors.toList());

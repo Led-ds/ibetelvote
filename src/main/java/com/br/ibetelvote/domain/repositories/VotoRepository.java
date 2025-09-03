@@ -1,6 +1,7 @@
 package com.br.ibetelvote.domain.repositories;
 
 import com.br.ibetelvote.domain.entities.Voto;
+import com.br.ibetelvote.domain.entities.enums.TipoVoto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -11,6 +12,7 @@ import java.util.UUID;
 
 public interface VotoRepository {
 
+    // === OPERAÇÕES BÁSICAS ===
     void deleteById(UUID id);
     long count();
 
@@ -43,164 +45,183 @@ public interface VotoRepository {
     boolean existsByMembroIdAndCargoPretendidoIdAndEleicaoId(UUID membroId, UUID cargoPretendidoId, UUID eleicaoId);
     boolean existsByMembroIdAndEleicaoId(UUID membroId, UUID eleicaoId);
 
-    // === CONSULTAS POR TIPO DE VOTO ===
-    List<Voto> findByVotoBrancoTrue();
-    List<Voto> findByVotoNuloTrue();
-    List<Voto> findVotosValidos();
-    List<Voto> findByEleicaoIdAndVotoBrancoTrue(UUID eleicaoId);
-    List<Voto> findByEleicaoIdAndVotoNuloTrue(UUID eleicaoId);
-    List<Voto> findVotosValidosByEleicao(UUID eleicaoId);
+    // === CONSULTAS POR TIPO DE VOTO (USANDO ENUM) ===
+    List<Voto> findByTipoVoto(TipoVoto tipoVoto);
+    List<Voto> findByEleicaoIdAndTipoVoto(UUID eleicaoId, TipoVoto tipoVoto);
+    List<Voto> findByCargoPretendidoIdAndTipoVoto(UUID cargoPretendidoId, TipoVoto tipoVoto);
 
-    // === CONSULTAS POR CARGO E TIPO ===
-    List<Voto> findByCargoPretendidoIdAndVotoBrancoTrue(UUID cargoPretendidoId);
-    List<Voto> findByCargoPretendidoIdAndVotoNuloTrue(UUID cargoPretendidoId);
-    List<Voto> findVotosValidosByCargoPretendido(UUID cargoPretendidoId);
+    long countByTipoVoto(TipoVoto tipoVoto);
+    long countByEleicaoIdAndTipoVoto(UUID eleicaoId, TipoVoto tipoVoto);
+    long countByCargoPretendidoIdAndTipoVoto(UUID cargoPretendidoId, TipoVoto tipoVoto);
 
     // === CONSULTAS POR PERÍODO ===
     List<Voto> findByDataVotoBetween(LocalDateTime inicio, LocalDateTime fim);
     List<Voto> findByEleicaoIdAndDataVotoBetween(UUID eleicaoId, LocalDateTime inicio, LocalDateTime fim);
     Page<Voto> findByDataVotoBetween(LocalDateTime inicio, LocalDateTime fim, Pageable pageable);
 
-    // === ESTATÍSTICAS GERAIS ===
-    long countByVotoBrancoTrue();
-    long countByVotoNuloTrue();
-    long countVotosValidos();
-
-    // === ESTATÍSTICAS POR ELEIÇÃO ===
-    long countByEleicaoIdAndVotoBrancoTrue(UUID eleicaoId);
-    long countByEleicaoIdAndVotoNuloTrue(UUID eleicaoId);
-    long countVotosValidosByEleicao(UUID eleicaoId);
-
-    // === ESTATÍSTICAS POR CARGO PRETENDIDO ===
-    long countByCargoPretendidoIdAndVotoBrancoTrue(UUID cargoPretendidoId);
-    long countByCargoPretendidoIdAndVotoNuloTrue(UUID cargoPretendidoId);
-    long countVotosValidosByCargoPretendido(UUID cargoPretendidoId);
-
-    // === RELATÓRIOS E CONSULTAS CUSTOMIZADAS ===
-
-    /**
-     * Conta votos por candidato em uma eleição específica
-     */
-    List<Object[]> countVotosByCandidatoAndCargoPretendido(UUID eleicaoId);
-
-    /**
-     * Conta votos por hora em uma eleição
-     */
-    List<Object[]> countVotosByHora(UUID eleicaoId);
-
-    /**
-     * Busca ranking de candidatos por número de votos
-     */
-    List<Object[]> findRankingCandidatosPorVotos(UUID eleicaoId, UUID cargoPretendidoId);
-
-    /**
-     * Busca distribuição de votos por tipo
-     */
-    List<Object[]> findDistribuicaoVotosPorTipo(UUID eleicaoId);
-
-    /**
-     * Busca progresso da votação ao longo do tempo
-     */
-    List<Object[]> findProgressoVotacao(UUID eleicaoId);
-
-    /**
-     * Conta votos únicos por membro em uma eleição
-     */
-    long countVotantesUnicosByEleicao(UUID eleicaoId);
-
-    /**
-     * Busca últimos votos registrados
-     */
-    List<Voto> findUltimosVotosRegistrados(int limite);
-
-    /**
-     * Busca votos por range de hash (para auditoria)
-     */
+    // === CONSULTAS POR HASH E IP (PARA AUDITORIA) ===
     List<Voto> findByHashVotoContaining(String hashFragment);
-
-    /**
-     * Busca votos com dados incompletos (para limpeza)
-     */
-    List<Voto> findVotosComDadosIncompletos();
-
-    /**
-     * Busca votos por IP de origem (para análise de segurança)
-     */
     List<Voto> findByIpOrigemContaining(String ipPattern);
 
-    // === CONSULTAS PARA AUDITORIA ===
+    // === MÉTODOS DE CONVENIÊNCIA COM DEFAULT (NÃO PRECISAM SER IMPLEMENTADOS) ===
 
-    /**
-     * Busca votos para auditoria (sem dados sensíveis)
-     */
-    List<Voto> findVotosParaAuditoria(UUID eleicaoId);
+    default List<Voto> findVotosBrancos() {
+        return findByTipoVoto(TipoVoto.BRANCO);
+    }
 
-    /**
-     * Conta total de votantes distintos por eleição
-     */
+    default List<Voto> findVotosNulos() {
+        return findByTipoVoto(TipoVoto.NULO);
+    }
+
+    default List<Voto> findVotosValidos() {
+        return findByTipoVoto(TipoVoto.CANDIDATO);
+    }
+
+    default List<Voto> findVotosValidosByEleicao(UUID eleicaoId) {
+        return findByEleicaoIdAndTipoVoto(eleicaoId, TipoVoto.CANDIDATO);
+    }
+
+    default List<Voto> findVotosValidosByCargoPretendido(UUID cargoPretendidoId) {
+        return findByCargoPretendidoIdAndTipoVoto(cargoPretendidoId, TipoVoto.CANDIDATO);
+    }
+
+    default long countVotosBrancos() {
+        return countByTipoVoto(TipoVoto.BRANCO);
+    }
+
+    default long countVotosNulos() {
+        return countByTipoVoto(TipoVoto.NULO);
+    }
+
+    default long countVotosValidos() {
+        return countByTipoVoto(TipoVoto.CANDIDATO);
+    }
+
+    default long countVotosValidosByEleicao(UUID eleicaoId) {
+        return countByEleicaoIdAndTipoVoto(eleicaoId, TipoVoto.CANDIDATO);
+    }
+
+    default long countVotosValidosByCargoPretendido(UUID cargoPretendidoId) {
+        return countByCargoPretendidoIdAndTipoVoto(cargoPretendidoId, TipoVoto.CANDIDATO);
+    }
+
+    // === MÉTODOS COMPLEXOS (IMPLEMENTADOS NO JPAREPO COM @QUERY) ===
+    // Estes métodos devem ser implementados no VotoJpaRepository com anotações @Query
+
     long countDistinctMembroByEleicaoId(UUID eleicaoId);
-
-    /**
-     * Verifica integridade dos votos por hash
-     */
-    List<Voto> findVotosComHashDuplicado();
-
-    /**
-     * Busca votos suspeitos (mesmo IP, user agent, etc.)
-     */
+    List<Object[]> countVotosByCandidatoAndCargo(UUID eleicaoId);
+    List<Object[]> countVotosByHora(UUID eleicaoId);
+    List<Object[]> findRankingCandidatosPorVotos(UUID eleicaoId, UUID cargoPretendidoId);
     List<Object[]> findVotosSuspeitos(UUID eleicaoId);
-
-    // === CONSULTAS ESPECÍFICAS PARA RELATÓRIOS ===
-
-    /**
-     * Busca resumo de votação por cargo pretendido
-     */
-    List<Object[]> getResumoVotacaoPorCargo(UUID eleicaoId);
-
-    /**
-     * Busca participação por cargo atual do membro
-     */
+    List<Object[]> countVotosPorIpOrigem(UUID eleicaoId);
     List<Object[]> getParticipacaoPorCargoMembro(UUID eleicaoId);
 
-    /**
-     * Busca tendências de votação por período
-     */
-    List<Object[]> getTendenciasVotacaoPorPeriodo(UUID eleicaoId, LocalDateTime inicio, LocalDateTime fim);
-
-    // === MÉTODOS DE VALIDAÇÃO E SEGURANÇA ===
-
-    /**
-     * Verifica se existe voto duplicado para o mesmo candidato
-     */
-    boolean existsVotoDuplicado(UUID membroId, UUID candidatoId, UUID eleicaoId);
-
-    /**
-     * Conta votos por IP para detectar possíveis irregularidades
-     */
-    List<Object[]> countVotosPorIpOrigem(UUID eleicaoId);
-
-    /**
-     * Busca votos registrados muito próximos no tempo (possível automação)
-     */
+    List<Voto> findVotosParaAuditoria(UUID eleicaoId);
+    List<Voto> findVotosComDadosIncompletos();
+    List<Voto> findVotosComHashDuplicado();
+    List<Voto> findUltimosVotosRegistrados(int limite);
     List<Voto> findVotosSequenciaisRapidos(UUID eleicaoId, int segundosIntervalo);
 
-    // === COMPATIBILIDADE TEMPORÁRIA ===
+    boolean existsVotoDuplicado(UUID membroId, UUID candidatoId, UUID eleicaoId);
+
+    // === MÉTODOS DEPRECATED PARA COMPATIBILIDADE ===
 
     /**
-     * @deprecated Usar findByCargoPretendidoId
+     * @deprecated Usar findByTipoVoto(TipoVoto.BRANCO)
      */
     @Deprecated
-    List<Voto> findByCargoId(UUID cargoId);
+    default List<Voto> findByVotoBrancoTrue() {
+        return findByTipoVoto(TipoVoto.BRANCO);
+    }
 
     /**
-     * @deprecated Usar countByCargoPretendidoId
+     * @deprecated Usar findByTipoVoto(TipoVoto.NULO)
      */
     @Deprecated
-    long countByCargoId(UUID cargoId);
+    default List<Voto> findByVotoNuloTrue() {
+        return findByTipoVoto(TipoVoto.NULO);
+    }
 
     /**
-     * @deprecated Usar findByEleicaoIdAndCargoPretendidoId
+     * @deprecated Usar findByEleicaoIdAndTipoVoto(eleicaoId, TipoVoto.BRANCO)
      */
     @Deprecated
-    List<Voto> findByEleicaoIdAndCargoId(UUID eleicaoId, UUID cargoId);
+    default List<Voto> findByEleicaoIdAndVotoBrancoTrue(UUID eleicaoId) {
+        return findByEleicaoIdAndTipoVoto(eleicaoId, TipoVoto.BRANCO);
+    }
+
+    /**
+     * @deprecated Usar findByEleicaoIdAndTipoVoto(eleicaoId, TipoVoto.NULO)
+     */
+    @Deprecated
+    default List<Voto> findByEleicaoIdAndVotoNuloTrue(UUID eleicaoId) {
+        return findByEleicaoIdAndTipoVoto(eleicaoId, TipoVoto.NULO);
+    }
+
+    /**
+     * @deprecated Usar findByCargoPretendidoIdAndTipoVoto(cargoPretendidoId, TipoVoto.BRANCO)
+     */
+    @Deprecated
+    default List<Voto> findByCargoPretendidoIdAndVotoBrancoTrue(UUID cargoPretendidoId) {
+        return findByCargoPretendidoIdAndTipoVoto(cargoPretendidoId, TipoVoto.BRANCO);
+    }
+
+    /**
+     * @deprecated Usar findByCargoPretendidoIdAndTipoVoto(cargoPretendidoId, TipoVoto.NULO)
+     */
+    @Deprecated
+    default List<Voto> findByCargoPretendidoIdAndVotoNuloTrue(UUID cargoPretendidoId) {
+        return findByCargoPretendidoIdAndTipoVoto(cargoPretendidoId, TipoVoto.NULO);
+    }
+
+    /**
+     * @deprecated Usar countByTipoVoto(TipoVoto.BRANCO)
+     */
+    @Deprecated
+    default long countByVotoBrancoTrue() {
+        return countByTipoVoto(TipoVoto.BRANCO);
+    }
+
+    /**
+     * @deprecated Usar countByTipoVoto(TipoVoto.NULO)
+     */
+    @Deprecated
+    default long countByVotoNuloTrue() {
+        return countByTipoVoto(TipoVoto.NULO);
+    }
+
+    /**
+     * @deprecated Usar countByEleicaoIdAndTipoVoto(eleicaoId, TipoVoto.BRANCO)
+     */
+    @Deprecated
+    default long countByEleicaoIdAndVotoBrancoTrue(UUID eleicaoId) {
+        return countByEleicaoIdAndTipoVoto(eleicaoId, TipoVoto.BRANCO);
+    }
+
+    /**
+     * @deprecated Usar countByEleicaoIdAndTipoVoto(eleicaoId, TipoVoto.NULO)
+     */
+    @Deprecated
+    default long countByEleicaoIdAndVotoNuloTrue(UUID eleicaoId) {
+        return countByEleicaoIdAndTipoVoto(eleicaoId, TipoVoto.NULO);
+    }
+
+    /**
+     * @deprecated Usar countByCargoPretendidoIdAndTipoVoto(cargoPretendidoId, TipoVoto.BRANCO)
+     */
+    @Deprecated
+    default long countByCargoPretendidoIdAndVotoBrancoTrue(UUID cargoPretendidoId) {
+        return countByCargoPretendidoIdAndTipoVoto(cargoPretendidoId, TipoVoto.BRANCO);
+    }
+
+    /**
+     * @deprecated Usar countByCargoPretendidoIdAndTipoVoto(cargoPretendidoId, TipoVoto.NULO)
+     */
+    @Deprecated
+    default long countByCargoPretendidoIdAndVotoNuloTrue(UUID cargoPretendidoId) {
+        return countByCargoPretendidoIdAndTipoVoto(cargoPretendidoId, TipoVoto.NULO);
+    }
+
+
+
 }
