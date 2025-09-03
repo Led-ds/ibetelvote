@@ -13,6 +13,7 @@ public interface CandidatoService {
 
     // === OPERAÇÕES BÁSICAS ===
     CandidatoResponse createCandidato(CreateCandidatoRequest request);
+    Page<CandidatoResponse> getAllCandidatos(Pageable pageable);
     CandidatoResponse getCandidatoById(UUID id);
     CandidatoResponse getCandidatoByIdWithPhoto(UUID id);
     List<CandidatoResponse> getCandidatosByEleicaoId(UUID eleicaoId);
