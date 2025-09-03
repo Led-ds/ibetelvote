@@ -2,15 +2,14 @@ package com.br.ibetelvote.domain.entities;
 
 import com.br.ibetelvote.domain.entities.enums.HierarquiaCargo;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.core.type.TypeReference;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -69,8 +68,9 @@ public class Cargo {
     @JsonIgnore
     private Categoria categoria;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Enumerated(EnumType.STRING)
-    @Column(name = "hierarquia", nullable = false)
+    @Column(name = "hierarquia", nullable = false, columnDefinition = "hierarquia_cargo")
     @Builder.Default
     private HierarquiaCargo hierarquia = HierarquiaCargo.AUXILIAR;
 
@@ -81,105 +81,35 @@ public class Cargo {
     @Column(name = "requisitos_cargo", columnDefinition = "TEXT")
     private String requisitosCargo;
 
-    /**
-     * Array JSON com os cargos que podem se candidatar a este cargo
-     * Exemplo: ["MEMBRO", "OBREIRO", "DIACONO"]
-     * Usando conversão manual com Jackson para JSONB
-     */
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "elegibilidade", columnDefinition = "jsonb")
     @Builder.Default
-    private String elegibilidadeJson = "[]";
+    private List<String> elegibilidade = new ArrayList<>();
 
-    /**
-     * Indica se o cargo está disponível para eleições
-     */
-    /**
-     * Indica se o cargo está disponível para eleições
-     */
     @Builder.Default
     @Column(name = "disponivel_eleicao", nullable = false)
     private Boolean disponivelEleicao = true;
 
-    // === CAMPOS TRANSIENTES PARA ELEGIBILIDADE ===
 
-    @Transient
-    private static final ObjectMapper objectMapper = new ObjectMapper();
-
-
-    @Transient
-    private List<String> elegibilidade;
-
-    // === MÉTODOS PARA CONVERSÃO JSON ===
-
-    /**
-     * Converte lista de elegibilidade para JSON antes de persistir
-     */
-    @PrePersist
-    @PreUpdate
-    public void convertElegibilidadeToJson() {
-        try {
-            if (elegibilidade != null && !elegibilidade.isEmpty()) {
-                this.elegibilidadeJson = objectMapper.writeValueAsString(elegibilidade);
-            } else {
-                this.elegibilidadeJson = "[]";
-            }
-        } catch (JsonProcessingException e) {
-            this.elegibilidadeJson = "[]";
-        }
-    }
-
-    /**
-     * Converte JSON para lista de elegibilidade após carregar
-     */
-    @PostLoad
-    public void convertJsonToElegibilidade() {
-        try {
-            if (elegibilidadeJson != null && !elegibilidadeJson.trim().isEmpty() && !"null".equals(elegibilidadeJson)) {
-                TypeReference<List<String>> typeRef = new TypeReference<List<String>>() {};
-                this.elegibilidade = objectMapper.readValue(elegibilidadeJson, typeRef);
-            } else {
-                this.elegibilidade = new ArrayList<>();
-            }
-        } catch (JsonProcessingException e) {
-            this.elegibilidade = new ArrayList<>();
-        }
-
-        if (this.elegibilidade == null) {
-            this.elegibilidade = new ArrayList<>();
-        }
-    }
-
-    /**
-     * Getter para elegibilidade (inicializa se necessário)
-     */
     public List<String> getElegibilidade() {
         if (this.elegibilidade == null) {
-            convertJsonToElegibilidade();
+            this.elegibilidade = new ArrayList<>();
         }
         return this.elegibilidade;
     }
 
-    /**
-     * Setter para elegibilidade (converte para JSON)
-     */
+
     public void setElegibilidade(List<String> elegibilidade) {
         this.elegibilidade = elegibilidade != null ? elegibilidade : new ArrayList<>();
-        convertElegibilidadeToJson();
     }
 
-    // === MÉTODOS DE NEGÓCIO ===
 
-    /**
-     * Atualiza as informações básicas do cargo
-     */
     public void updateBasicInfo(String nome, String descricao) {
         this.nome = nome;
         this.descricao = descricao;
     }
 
-    /**
-     * Atualiza informações completas do cargo
-     */
+
     public void updateCompleteInfo(String nome, String descricao, Categoria categoria,
                                    HierarquiaCargo hierarquia, Integer ordemPrecedencia,
                                    String requisitosCargo, List<String> elegibilidade,
@@ -190,34 +120,23 @@ public class Cargo {
         this.hierarquia = hierarquia != null ? hierarquia : HierarquiaCargo.AUXILIAR;
         this.ordemPrecedencia = ordemPrecedencia;
         this.requisitosCargo = requisitosCargo;
-        setElegibilidade(elegibilidade); // Usa o setter que converte para JSON
+        setElegibilidade(elegibilidade);
         this.disponivelEleicao = disponivelEleicao != null ? disponivelEleicao : true;
     }
 
-    /**
-     * Ativa o cargo
-     */
+
     public void activate() {
         this.ativo = true;
     }
 
-    /**
-     * Desativa o cargo
-     */
     public void deactivate() {
         this.ativo = false;
     }
 
-    /**
-     * Ativa disponibilidade para eleições
-     */
     public void ativarParaEleicao() {
         this.disponivelEleicao = true;
     }
 
-    /**
-     * Desativa disponibilidade para eleições
-     */
     public void desativarParaEleicao() {
         this.disponivelEleicao = false;
     }
@@ -248,7 +167,7 @@ public class Cargo {
     /**
      * Verifica se um candidato específico pode se candidatar a este cargo
      */
-    public boolean podeReceberCandidaturaDeCargо(String cargoOrigem) {
+    public boolean podeReceberCandidaturaDeCargo(String cargoOrigem) {
         List<String> elegibilidades = getElegibilidade();
         return elegibilidades != null && elegibilidades.contains(cargoOrigem);
     }
@@ -266,9 +185,9 @@ public class Cargo {
     public void adicionarElegibilidade(String cargo) {
         if (cargo != null && !cargo.trim().isEmpty()) {
             List<String> elegibilidades = getElegibilidade();
-            if (!elegibilidades.contains(cargo.toUpperCase())) {
-                elegibilidades.add(cargo.toUpperCase());
-                setElegibilidade(elegibilidades);
+            String cargoUpperCase = cargo.toUpperCase();
+            if (!elegibilidades.contains(cargoUpperCase)) {
+                elegibilidades.add(cargoUpperCase);
             }
         }
     }
@@ -279,9 +198,7 @@ public class Cargo {
     public void removerElegibilidade(String cargo) {
         if (cargo != null) {
             List<String> elegibilidades = getElegibilidade();
-            if (elegibilidades.remove(cargo.toUpperCase())) {
-                setElegibilidade(elegibilidades);
-            }
+            elegibilidades.remove(cargo.toUpperCase());
         }
     }
 
@@ -541,7 +458,7 @@ public class Cargo {
     public static CargoBuilder completo(String nome, String descricao, Categoria categoria,
                                         HierarquiaCargo hierarquia, Integer ordem,
                                         String requisitos, List<String> elegibilidade) {
-        CargoBuilder builder = Cargo.builder()
+        return Cargo.builder()
                 .nome(normalizarNome(nome))
                 .descricao(descricao)
                 .categoria(categoria)
@@ -549,21 +466,8 @@ public class Cargo {
                 .ordemPrecedencia(ordem)
                 .requisitosCargo(requisitos)
                 .ativo(true)
-                .disponivelEleicao(true);
-
-        // Configurar elegibilidade via JSON
-        if (elegibilidade != null && !elegibilidade.isEmpty()) {
-            try {
-                String elegibilidadeJson = objectMapper.writeValueAsString(elegibilidade);
-                builder.elegibilidadeJson(elegibilidadeJson);
-            } catch (JsonProcessingException e) {
-                builder.elegibilidadeJson("[]");
-            }
-        } else {
-            builder.elegibilidadeJson("[]");
-        }
-
-        return builder;
+                .disponivelEleicao(true)
+                .elegibilidade(elegibilidade != null ? new ArrayList<>(elegibilidade) : new ArrayList<>());
     }
 
     // === MÉTODOS DE COMPARAÇÃO ===

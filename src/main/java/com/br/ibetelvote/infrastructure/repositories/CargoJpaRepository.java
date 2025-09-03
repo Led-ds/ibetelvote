@@ -149,7 +149,7 @@ public interface CargoJpaRepository extends JpaRepository<Cargo, UUID>, CargoRep
     @Query(value = """
         SELECT c.* FROM cargos c 
         WHERE c.ativo = true 
-        AND c.elegibilidade::text LIKE CONCAT('%', :elegibilidade, '%')
+        AND jsonb_exists(c.elegibilidade, :elegibilidade)
         """, nativeQuery = true)
     List<Cargo> findCargosPorElegibilidade(@Param("elegibilidade") String elegibilidade);
 
@@ -164,14 +164,14 @@ public interface CargoJpaRepository extends JpaRepository<Cargo, UUID>, CargoRep
     /**
      * Verifica se um cargo pode candidatar-se a outro
      */
-    @Query("""
-            SELECT CASE WHEN COUNT(c2) > 0 THEN true ELSE false END 
-            FROM Cargo c1, Cargo c2 
-            WHERE c1.id = :cargoOrigemId 
-            AND c2.id = :cargoDestinoId 
-            AND c1.hierarquia <= c2.hierarquia
-            AND c2.elegibilidadeJson LIKE CONCAT('%', c1.hierarquia, '%')
-            """)
+    @Query(value = """
+        SELECT CASE WHEN COUNT(c2) > 0 THEN true ELSE false END 
+        FROM cargos c1, cargos c2 
+        WHERE c1.id = :cargoOrigemId 
+        AND c2.id = :cargoDestinoId 
+        AND c1.hierarquia <= c2.hierarquia
+        AND jsonb_exists(c2.elegibilidade, c1.hierarquia::text)
+        """, nativeQuery = true)
     boolean verificarElegibilidade(@Param("cargoOrigemId") UUID cargoOrigemId, @Param("cargoDestinoId") UUID cargoDestinoId);
 
     // === CONSULTAS ESPECÍFICAS COMBINADAS ===
@@ -355,13 +355,13 @@ public interface CargoJpaRepository extends JpaRepository<Cargo, UUID>, CargoRep
      * Busca cargos com informações incompletas
      */
     @Query("""
-            SELECT c FROM Cargo c WHERE
-            c.nome IS NULL OR c.nome = '' OR
-            c.descricao IS NULL OR c.descricao = '' OR
-            c.categoria IS NULL OR
-            c.hierarquia IS NULL OR
-            c.elegibilidadeJson IS NULL OR c.elegibilidadeJson = '' OR c.elegibilidadeJson = 'null'
-            """)
+        SELECT c FROM Cargo c WHERE
+        c.nome IS NULL OR c.nome = '' OR
+        c.descricao IS NULL OR c.descricao = '' OR
+        c.categoria IS NULL OR
+        c.hierarquia IS NULL OR
+        c.elegibilidade IS NULL OR SIZE(c.elegibilidade) = 0
+        """)
     List<Cargo> findCargosIncompletos();
 
     // === CONSULTAS ESPECÍFICAS DO CONTEXTO ECLESIÁSTICO ===
@@ -393,14 +393,14 @@ public interface CargoJpaRepository extends JpaRepository<Cargo, UUID>, CargoRep
     /**
      * Cargos que podem eleger para determinado cargo (baseado na hierarquia e elegibilidade)
      */
-    @Query("""
-            SELECT c1 FROM Cargo c1, Cargo c2 WHERE
-            c2.id = :cargoDestinoId AND
-            c1.ativo = true AND
-            c1.hierarquia <= c2.hierarquia AND
-            c2.elegibilidadeJson LIKE CONCAT('%', c1.hierarquia, '%')
-            ORDER BY c1.hierarquia, c1.nome
-            """)
+    @Query(value = """
+        SELECT c1.* FROM cargos c1, cargos c2 WHERE
+        c2.id = :cargoDestinoId AND
+        c1.ativo = true AND
+        c1.hierarquia <= c2.hierarquia AND
+        jsonb_exists(c2.elegibilidade, c1.hierarquia::text)
+        ORDER BY c1.hierarquia, c1.nome
+        """, nativeQuery = true)
     List<Cargo> findCargosQuePodemElegerPara(@Param("cargoDestinoId") UUID cargoDestinoId);
 
     // === CONSULTAS ADICIONAIS ÚTEIS ===
