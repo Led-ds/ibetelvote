@@ -53,6 +53,20 @@ public class CandidatoController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO', 'MEMBRO')")
+    @Operation(summary = "Listar todos os candidatos", description = "Lista todos os candidatos com paginação")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Lista retornada com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado")
+    })
+    public ResponseEntity<Page<CandidatoResponse>> getAllCandidatos(
+            @PageableDefault(size = 20, sort = "nome") Pageable pageable) {
+        Page<CandidatoResponse> response = candidatoService.getAllCandidatos(pageable);
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO', 'MEMBRO')")
     @Operation(summary = "Buscar candidato por ID", description = "Retorna os dados de um candidato específico")

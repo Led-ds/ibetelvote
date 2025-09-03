@@ -70,6 +70,16 @@ public class CandidatoServiceImpl implements CandidatoService {
     }
 
     @Override
+    @Cacheable(value = "candidatos-all")
+    @Transactional(readOnly = true)
+    public Page<CandidatoResponse> getAllCandidatos(Pageable pageable) {
+        log.debug("Buscando todos os candidatos com paginação");
+
+        Page<Candidato> candidatos = candidatoRepository.findAll(pageable);
+        return candidatos.map(candidatoMapper::toResponse);
+    }
+
+    @Override
     @Cacheable(value = "candidatos", key = "#id")
     @Transactional(readOnly = true)
     public CandidatoResponse getCandidatoById(UUID id) {
