@@ -11,6 +11,8 @@ import com.br.ibetelvote.domain.entities.enums.HierarquiaCargo;
 import com.br.ibetelvote.domain.services.CargoService;
 import com.br.ibetelvote.infrastructure.repositories.CargoJpaRepository;
 import com.br.ibetelvote.infrastructure.repositories.CategoriaJpaRepository;
+import com.br.ibetelvote.infrastructure.specifications.CargoSpecifications;
+import org.springframework.data.jpa.domain.Specification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -169,7 +171,14 @@ public class CargoServiceImpl implements CargoService {
         log.debug("Buscando cargos com filtros: nome={}, categoria={}, hierarquia={}, ativo={}, disponivel={}",
                 nome, categoriaId, hierarquia, ativo, disponivelEleicao);
 
-        Page<Cargo> cargos = cargoRepository.findByFiltros(nome, categoriaId, hierarquia, ativo, disponivelEleicao, pageable);
+        Specification<Cargo> spec = CargoSpecifications.comNome(nome)
+                .and(CargoSpecifications.daCategoria(categoriaId))
+                .and(CargoSpecifications.comHierarquia(hierarquia))
+                .and(CargoSpecifications.ativo(ativo))
+                .and(CargoSpecifications.disponivelParaEleicao(disponivelEleicao))
+                .and(CargoSpecifications.ordenadoPorPrecedencia());
+
+        Page<Cargo> cargos = cargoRepository.findAll(spec, pageable);
         return cargos.map(cargoMapper::toResponse);
     }
 
@@ -180,7 +189,7 @@ public class CargoServiceImpl implements CargoService {
     public List<CargoResponse> getCargosByCategoria(UUID categoriaId) {
         log.debug("Buscando cargos da categoria: {}", categoriaId);
 
-        List<Cargo> cargos = cargoRepository.findByCategoriaId(categoriaId);
+        List<Cargo> cargos = cargoRepository.findByCategoria_Id(categoriaId);
         return cargoMapper.toResponseList(cargos);
     }
 
@@ -189,7 +198,7 @@ public class CargoServiceImpl implements CargoService {
     public List<CargoResponse> getCargosOrdenadosByCategoria(UUID categoriaId) {
         log.debug("Buscando cargos ordenados da categoria: {}", categoriaId);
 
-        List<Cargo> cargos = cargoRepository.findByCategoriaIdOrderByOrdemPrecedenciaAscNomeAsc(categoriaId);
+        List<Cargo> cargos = cargoRepository.findByCategoria_IdOrderByOrdemPrecedenciaAscNomeAsc(categoriaId);
         return cargoMapper.toResponseList(cargos);
     }
 
@@ -198,7 +207,7 @@ public class CargoServiceImpl implements CargoService {
     public List<CargoResponse> getCargosAtivosByCategoria(UUID categoriaId) {
         log.debug("Buscando cargos ativos da categoria: {}", categoriaId);
 
-        List<Cargo> cargos = cargoRepository.findByCategoriaIdAndAtivoTrue(categoriaId);
+        List<Cargo> cargos = cargoRepository.findByCategoria_IdAndAtivoTrue(categoriaId);
         return cargoMapper.toResponseList(cargos);
     }
 
@@ -316,7 +325,8 @@ public class CargoServiceImpl implements CargoService {
     public List<CargoResponse> getCargosIncompletos() {
         log.debug("Buscando cargos com informações incompletas");
 
-        List<Cargo> cargos = cargoRepository.findCargosIncompletos();
+        Specification<Cargo> spec = CargoSpecifications.comInformacoesIncompletas();
+        List<Cargo> cargos = cargoRepository.findAll(spec);
         return cargoMapper.toResponseList(cargos);
     }
 
@@ -325,7 +335,10 @@ public class CargoServiceImpl implements CargoService {
     public List<CargoResponse> getCargosComCandidatos() {
         log.debug("Buscando cargos que possuem candidatos");
 
-        List<Cargo> cargos = cargoRepository.findCargosComCandidatos();
+        Specification<Cargo> spec = CargoSpecifications.comCandidatos()
+                .and(CargoSpecifications.ordenadoPorNome());
+
+        List<Cargo> cargos = cargoRepository.findAll(spec);
         return cargoMapper.toResponseList(cargos);
     }
 
@@ -463,7 +476,15 @@ public class CargoServiceImpl implements CargoService {
     public List<CargoResponse> getCargosElegiveisParaCargo(UUID cargoId) {
         log.debug("Buscando cargos elegíveis para o cargo: {}", cargoId);
 
-        List<Cargo> cargos = cargoRepository.findCargosQuePodemElegerPara(cargoId);
+        // Primeiro busca o cargo para pegar o nome
+        Cargo cargo = cargoRepository.findById(cargoId)
+                .orElseThrow(() -> new IllegalArgumentException("Cargo não encontrado com ID: " + cargoId));
+
+        Specification<Cargo> spec = CargoSpecifications.podeElegerPara(cargo.getNome())
+                .and(CargoSpecifications.ativo(true))
+                .and(CargoSpecifications.ordenadoPorNome());
+
+        List<Cargo> cargos = cargoRepository.findAll(spec);
         return cargoMapper.toResponseList(cargos);
     }
 
@@ -472,7 +493,11 @@ public class CargoServiceImpl implements CargoService {
     public List<CargoResponse> getCargosElegiveisParaHierarquia(HierarquiaCargo hierarquia) {
         log.debug("Buscando cargos elegíveis para hierarquia: {}", hierarquia);
 
-        List<Cargo> cargos = cargoRepository.findCargosElegiveisParaHierarquia(hierarquia);
+        Specification<Cargo> spec = CargoSpecifications.podeElegerParaHierarquia(hierarquia)
+                .and(CargoSpecifications.ativo(true))
+                .and(CargoSpecifications.ordenadoPorHierarquia());
+
+        List<Cargo> cargos = cargoRepository.findAll(spec);
         return cargoMapper.toResponseList(cargos);
     }
 
@@ -481,7 +506,12 @@ public class CargoServiceImpl implements CargoService {
     public List<CargoResponse> getCargosElegiveisParaMembro(String nivelMembro) {
         log.debug("Buscando cargos elegíveis para membro nível: {}", nivelMembro);
 
-        List<Cargo> cargos = cargoRepository.findCargosElegiveisParaMembro(nivelMembro);
+        Specification<Cargo> spec = CargoSpecifications.elegiveisParaNivelMembro(nivelMembro)
+                .and(CargoSpecifications.ativo(true))
+                .and(CargoSpecifications.disponivelParaEleicao(true))
+                .and(CargoSpecifications.ordenadoPorPrecedencia());
+
+        List<Cargo> cargos = cargoRepository.findAll(spec);
         return cargoMapper.toResponseList(cargos);
     }
 
@@ -490,7 +520,9 @@ public class CargoServiceImpl implements CargoService {
     public boolean verificarElegibilidade(UUID cargoOrigemId, UUID cargoDestinoId) {
         log.debug("Verificando elegibilidade entre cargos: origem={}, destino={}", cargoOrigemId, cargoDestinoId);
 
-        return cargoRepository.verificarElegibilidade(cargoOrigemId, cargoDestinoId);
+        Specification<Cargo> spec = CargoSpecifications.elegibilidadeEntreCargos(cargoOrigemId, cargoDestinoId);
+
+        return cargoRepository.findOne(spec).isPresent();
     }
 
     // === VALIDAÇÕES ===
@@ -498,7 +530,8 @@ public class CargoServiceImpl implements CargoService {
     @Override
     @Transactional(readOnly = true)
     public boolean existsCargoByNome(String nome) {
-        return cargoRepository.existsByNome(nome);
+        Specification<Cargo> spec = CargoSpecifications.comNomeExato(nome);
+        return cargoRepository.findOne(spec).isPresent();
     }
 
     @Override
@@ -510,7 +543,8 @@ public class CargoServiceImpl implements CargoService {
     @Override
     @Transactional(readOnly = true)
     public boolean isNomeDisponivelParaAtualizacao(String nome, UUID cargoId) {
-        return !cargoRepository.existsByNomeAndIdNot(nome, cargoId);
+        Specification<Cargo> spec = CargoSpecifications.comNomeExatoExcluindoId(nome, cargoId);
+        return cargoRepository.findOne(spec).isEmpty();
     }
 
     @Override
@@ -522,7 +556,8 @@ public class CargoServiceImpl implements CargoService {
     @Override
     @Transactional(readOnly = true)
     public boolean isOrdemPrecedenciaDisponivel(UUID categoriaId, Integer ordem) {
-        return cargoRepository.isOrdemPrecedenciaDisponivel(categoriaId, ordem);
+        Specification<Cargo> spec = CargoSpecifications.comOrdemPrecedencia(categoriaId, ordem);
+        return cargoRepository.findOne(spec).isEmpty();
     }
 
     // === ESTATÍSTICAS ===
@@ -684,7 +719,10 @@ public class CargoServiceImpl implements CargoService {
     public List<CargoResponse> getCargosPorPeriodo(LocalDateTime inicio, LocalDateTime fim) {
         log.debug("Buscando cargos por período: {} - {}", inicio, fim);
 
-        List<Cargo> cargos = cargoRepository.findByCreatedAtBetween(inicio, fim);
+        Specification<Cargo> spec = CargoSpecifications.criadosEntre(inicio, fim)
+                .and(CargoSpecifications.ordenadoPorNome());
+
+        List<Cargo> cargos = cargoRepository.findAll(spec);
         return cargoMapper.toResponseList(cargos);
     }
 
@@ -705,7 +743,7 @@ public class CargoServiceImpl implements CargoService {
     public List<CargoBasicInfo> getCargosBasicInfoByCategoria(UUID categoriaId) {
         log.debug("Buscando informações básicas dos cargos da categoria: {}", categoriaId);
 
-        List<Cargo> cargos = cargoRepository.findByCategoriaIdAndAtivoTrue(categoriaId);
+        List<Cargo> cargos = cargoRepository.findByCategoria_IdAndAtivoTrue(categoriaId);
         return cargoMapper.toBasicInfoList(cargos);
     }
 

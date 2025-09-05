@@ -442,7 +442,7 @@ public class MembroServiceImpl implements MembroService {
         } else if (cargosDisponiveis != null) {
             for (String cargo : cargosDisponiveis) {
                 // Buscar cargo por nome
-                Cargo cargoEntity = cargoRepository.findByNome(cargo).orElse(null);
+                Cargo cargoEntity = (Cargo) cargoRepository.findByNome(cargo).orElse(null);
                 if (cargoEntity != null && membro.podeSeCandidarPara(cargoEntity)) {
                     cargosElegiveis.add(cargo);
                 }
