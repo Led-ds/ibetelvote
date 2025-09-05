@@ -59,4 +59,9 @@ public interface VotoService {
     Page<VotoResponse> buscarVotosComFiltros(VotoFilterRequest filtros, Pageable pageable);
     boolean validarIntegridadeVotacao(UUID eleicaoId);
     Map<String, Object> getMetricasTempoReal(UUID eleicaoId);
+
+    boolean membroJaVotouNoCandidato(UUID membroId, UUID candidatoId);
+    Map<String, Object> consultarLimiteVotacao(UUID membroId, UUID eleicaoId, UUID cargoId);
+    boolean membroPodeVotarMaisNoCargo(UUID membroId, UUID eleicaoId, UUID cargoId);
+
 }

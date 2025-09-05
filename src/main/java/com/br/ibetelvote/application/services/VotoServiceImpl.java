@@ -28,13 +28,13 @@ import java.util.stream.Collectors;
 @Transactional
 public class VotoServiceImpl implements VotoService {
 
-
     private final VotoJpaRepository votoRepository;
     private final MembroJpaRepository membroRepository;
     private final EleicaoJpaRepository eleicaoRepository;
     private final CargoJpaRepository cargoRepository;
     private final CandidatoJpaRepository candidatoRepository;
     private final VotoMapper votoMapper;
+    private final EleicaoConfigService eleicaoConfigService;
 
     // === OPERAÇÃO PRINCIPAL REFATORADA ===
 
@@ -339,7 +339,7 @@ public class VotoServiceImpl implements VotoService {
     public List<String> validarVotacao(UUID membroId, VotarRequest request) {
         List<String> erros = new ArrayList<>();
 
-        // Validar membro (buscar uma única vez)
+        // Validar membro
         Optional<Membro> membroOpt = membroRepository.findById(membroId);
         if (membroOpt.isEmpty()) {
             erros.add("Membro não encontrado");
@@ -355,7 +355,7 @@ public class VotoServiceImpl implements VotoService {
             erros.add("Membro deve ter usuário associado para votar");
         }
 
-        // Validar eleição (buscar uma única vez)
+        // Validar eleição
         Optional<Eleicao> eleicaoOpt = eleicaoRepository.findById(request.getEleicaoId());
         if (eleicaoOpt.isEmpty()) {
             erros.add("Eleição não encontrada");
@@ -365,11 +365,6 @@ public class VotoServiceImpl implements VotoService {
         Eleicao eleicao = eleicaoOpt.get();
         if (!eleicao.isVotacaoAberta()) {
             erros.add("Eleição não está aberta para votação");
-        }
-
-        // Validar se já votou
-        if (membroJaVotou(membroId, request.getEleicaoId())) {
-            erros.add("Membro já votou nesta eleição");
         }
 
         // Validar votos individuais
@@ -384,15 +379,11 @@ public class VotoServiceImpl implements VotoService {
 
     private List<String> validarVotosIndividuais(List<VotarRequest.VotoIndividual> votos, Membro membro, Eleicao eleicao) {
         List<String> erros = new ArrayList<>();
-        Set<UUID> cargosVotados = new HashSet<>();
+        Map<UUID, Integer> votosPorCargo = new HashMap<>();
 
         for (VotarRequest.VotoIndividual voto : votos) {
-            // Verificar voto duplicado no mesmo cargo
-            if (cargosVotados.contains(voto.getCargoPretendidoId())) {
-                erros.add("Não é possível votar duas vezes no mesmo cargo");
-                continue;
-            }
-            cargosVotados.add(voto.getCargoPretendidoId());
+            // Contar votos por cargo
+            votosPorCargo.merge(voto.getCargoPretendidoId(), 1, Integer::sum);
 
             // Validar cargo
             Optional<Cargo> cargoOpt = cargoRepository.findById(voto.getCargoPretendidoId());
@@ -407,14 +398,29 @@ public class VotoServiceImpl implements VotoService {
                 continue;
             }
 
+            int votosJaDadosNoCargo = eleicao.contarVotosDoMembroNoCargo(membro.getId(), cargo.getId());
+            int votosNaRequisicao = votosPorCargo.get(cargo.getId());
+            int totalVotosSeConfirmado = votosJaDadosNoCargo + votosNaRequisicao;
+            int limiteVagas = eleicao.getLimiteVotosPorCargo(cargo.getId());
+
+            if (totalVotosSeConfirmado > limiteVagas) {
+                erros.add(String.format("Excede limite de %d votos para cargo %s (já tem %d, tentando adicionar %d)",
+                        limiteVagas, cargo.getNome(), votosJaDadosNoCargo, votosNaRequisicao));
+                continue;
+            }
+
             // Validar tipo de voto
             if (!validarTipoVoto(voto)) {
                 erros.add("Deve escolher exatamente um tipo de voto por cargo");
                 continue;
             }
 
-            // Validar candidato se especificado
             if (voto.getCandidatoId() != null) {
+                if (eleicao.membroJaVotouNoCandidato(membro.getId(), voto.getCandidatoId())) {
+                    erros.add("Membro já votou neste candidato");
+                    continue;
+                }
+
                 erros.addAll(validarCandidato(voto, cargo, eleicao));
                 erros.addAll(validarHierarquiaVotacao(membro, cargo));
             }
@@ -653,6 +659,42 @@ public class VotoServiceImpl implements VotoService {
         metricas.put("participacaoAtual", calcularParticipacaoAtual(eleicaoId));
 
         return metricas;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean membroJaVotouNoCandidato(UUID membroId, UUID candidatoId) {
+        return votoRepository.existsByMembroIdAndCandidatoId(membroId, candidatoId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, Object> consultarLimiteVotacao(UUID membroId, UUID eleicaoId, UUID cargoId) {
+        // Buscar eleição
+        Eleicao eleicao = eleicaoRepository.findById(eleicaoId)
+                .orElseThrow(() -> new IllegalArgumentException("Eleição não encontrada"));
+
+        // Obter informações de limite
+        Eleicao.LimiteVotacaoInfo info = eleicao.getLimiteVotacaoParaMembro(membroId, cargoId);
+
+        Map<String, Object> limite = new HashMap<>();
+        limite.put("cargoId", info.cargoId);
+        limite.put("limiteVotos", info.limiteVotos);
+        limite.put("votosJaDados", info.votosJaDados);
+        limite.put("votosRestantes", info.getVotosRestantes());
+        limite.put("podeVotarMais", info.podeVotarMais);
+        limite.put("candidatosJaVotados", info.candidatosJaVotados);
+
+        return limite;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean membroPodeVotarMaisNoCargo(UUID membroId, UUID eleicaoId, UUID cargoId) {
+        Eleicao eleicao = eleicaoRepository.findById(eleicaoId)
+                .orElseThrow(() -> new IllegalArgumentException("Eleição não encontrada"));
+
+        return eleicao.membroPodeVotarMaisNoCargo(membroId, cargoId);
     }
 
     private Double calcularParticipacaoAtual(UUID eleicaoId) {

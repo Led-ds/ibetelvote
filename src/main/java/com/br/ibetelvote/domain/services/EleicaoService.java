@@ -16,9 +16,11 @@ public interface EleicaoService {
     EleicaoResponse updateEleicao(UUID id, UpdateEleicaoRequest request);
     void deleteEleicao(UUID id);
 
+    EleicaoResponse buscarDetalhada(UUID eleicaoId);
+
     // === OPERAÇÕES DE CONTROLE ===
-    void ativarEleicao(UUID id);
-    void desativarEleicao(UUID id);
+    EleicaoResponse  ativarEleicao(UUID id);
+    EleicaoResponse  desativarEleicao(UUID id);
     void encerrarEleicao(UUID id);
 
     // === CONSULTAS ESPECÍFICAS ===

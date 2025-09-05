@@ -11,8 +11,9 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Entity
@@ -78,6 +79,14 @@ public class Eleicao {
     @Column(name = "instrucoes_votacao", columnDefinition = "TEXT")
     private String instrucoesVotacao;
 
+    @ElementCollection
+    @CollectionTable(name = "eleicao_vagas_cargo",
+            joinColumns = @JoinColumn(name = "eleicao_id"))
+    @MapKeyColumn(name = "cargo_id")
+    @Column(name = "numero_vagas")
+    @Builder.Default
+    private Map<UUID, Integer> vagasPorCargo = new HashMap<>();
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -86,10 +95,6 @@ public class Eleicao {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    // === RELACIONAMENTOS CORRETOS ===
-
-    // ❌ REMOVIDO: List<Cargo> cargos - Cargo é catálogo independente!
-
     @OneToMany(mappedBy = "eleicao", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default
     private List<Candidato> candidatos = new ArrayList<>();
@@ -97,8 +102,6 @@ public class Eleicao {
     @OneToMany(mappedBy = "eleicao", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default
     private List<Voto> votos = new ArrayList<>();
-
-    // === MÉTODOS DE NEGÓCIO ===
 
     /**
      * Ativa a eleição após validações
@@ -122,38 +125,6 @@ public class Eleicao {
         this.ativa = false;
         this.dataFim = LocalDateTime.now();
     }
-
-    /**
-     * Incrementa o contador de votantes
-     */
-    public void incrementarVotantes() {
-        this.totalVotantes++;
-    }
-
-    /**
-     * Atualiza informações básicas da eleição
-     */
-    public void updateBasicInfo(String nome, String descricao, LocalDateTime dataInicio,
-                                LocalDateTime dataFim, String instrucoesVotacao) {
-        this.nome = nome;
-        this.descricao = descricao;
-        this.dataInicio = dataInicio;
-        this.dataFim = dataFim;
-        this.instrucoesVotacao = instrucoesVotacao;
-    }
-
-    /**
-     * Atualiza configurações da eleição
-     */
-    public void updateConfiguracoes(Boolean permiteVotoBranco, Boolean permiteVotoNulo,
-                                    Boolean exibeResultadosParciais, Integer totalElegiveis) {
-        this.permiteVotoBranco = permiteVotoBranco;
-        this.permiteVotoNulo = permiteVotoNulo;
-        this.exibeResultadosParciais = exibeResultadosParciais;
-        this.totalElegiveis = totalElegiveis;
-    }
-
-    // === MÉTODOS DE VALIDAÇÃO E STATUS ===
 
     /**
      * Verifica se a eleição está ativa
@@ -195,10 +166,149 @@ public class Eleicao {
     }
 
     /**
-     * Verifica se tem candidatos (independente do status)
+     * Retorna candidatos aprovados
      */
-    public boolean temCandidatos() {
-        return candidatos != null && !candidatos.isEmpty();
+    public List<Candidato> getCandidatosAprovados() {
+        if (candidatos == null) return new ArrayList<>();
+
+        return candidatos.stream()
+                .filter(candidato -> candidato.getAprovado() != null && candidato.getAprovado())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Retorna candidatos aprovados por cargo específico
+     */
+    public List<Candidato> getCandidatosPorCargo(UUID cargoId) {
+        if (candidatos == null || cargoId == null) return new ArrayList<>();
+
+        return candidatos.stream()
+                .filter(candidato -> candidato.getAprovado() != null && candidato.getAprovado())
+                .filter(candidato -> candidato.getCargoPretendido() != null)
+                .filter(candidato -> cargoId.equals(candidato.getCargoPretendido().getId()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Verifica se tem candidatos para um cargo específico
+     */
+    public boolean temCandidatosParaCargo(UUID cargoId) {
+        return !getCandidatosPorCargo(cargoId).isEmpty();
+    }
+
+    /**
+     * Retorna cargos que têm candidatos aprovados nesta eleição
+     */
+    public List<Cargo> getCargosComCandidatos() {
+        if (candidatos == null) return new ArrayList<>();
+
+        return candidatos.stream()
+                .filter(candidato -> candidato.getAprovado() != null && candidato.getAprovado())
+                .map(Candidato::getCargoPretendido)
+                .filter(cargo -> cargo != null)
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    public Integer getLimiteVotosPorCargo(UUID cargoId) {
+        return vagasPorCargo.getOrDefault(cargoId, 0);
+    }
+
+    /**
+     * Verifica se cargo tem configuração de vagas
+     */
+    public boolean cargoTemConfiguracaoVagas(UUID cargoId) {
+        return vagasPorCargo.containsKey(cargoId) && vagasPorCargo.get(cargoId) > 0;
+    }
+
+    /**
+     * Retorna candidatos que o membro já votou em um cargo específico
+     */
+    public List<UUID> getCandidatosJaVotadosPeloMembroNoCargo(UUID membroId, UUID cargoId) {
+        if (votos == null) return new ArrayList<>();
+
+        return votos.stream()
+                .filter(voto -> voto.getMembro().getId().equals(membroId))
+                .filter(voto -> voto.getCargoPretendido().getId().equals(cargoId))
+                .filter(voto -> voto.getCandidato() != null) // Apenas votos em candidatos
+                .map(voto -> voto.getCandidato().getId())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Conta quantos votos o membro já deu para um cargo específico
+     */
+    public int contarVotosDoMembroNoCargo(UUID membroId, UUID cargoId) {
+        return getCandidatosJaVotadosPeloMembroNoCargo(membroId, cargoId).size();
+    }
+
+    /**
+     * Verifica se membro já votou no candidato específico
+     */
+    public boolean membroJaVotouNoCandidato(UUID membroId, UUID candidatoId) {
+        if (votos == null || candidatoId == null) return false;
+
+        return votos.stream()
+                .anyMatch(voto -> voto.getMembro().getId().equals(membroId) &&
+                        voto.getCandidato() != null &&
+                        voto.getCandidato().getId().equals(candidatoId));
+    }
+
+    /**
+     * Verifica se membro pode votar mais no cargo (não exceder limite de vagas)
+     */
+    public boolean membroPodeVotarMaisNoCargo(UUID membroId, UUID cargoId) {
+        // TODO: Implementar quando tivermos configuração de vagas por cargo
+        // Por enquanto, assume limite muito alto para não bloquear
+        int votosJaDados = contarVotosDoMembroNoCargo(membroId, cargoId);
+        int limiteVagas = 50; // Temporário - será configurável
+
+        return votosJaDados < limiteVagas;
+    }
+
+    /**
+     * Verifica se membro pode votar no candidato específico
+     */
+    public void validarVotoDoMembroNoCandidato(UUID membroId, UUID candidatoId, UUID cargoId) {
+        if (!isVotacaoAberta()) {
+            throw new IllegalStateException("Votação não está aberta");
+        }
+
+        if (membroJaVotouNoCandidato(membroId, candidatoId)) {
+            throw new IllegalStateException("Membro já votou neste candidato");
+        }
+
+        if (!cargoTemConfiguracaoVagas(cargoId)) {
+            throw new IllegalStateException("Cargo não possui configuração de vagas para esta eleição");
+        }
+
+        if (!membroPodeVotarMaisNoCargo(membroId, cargoId)) {
+            int limite = getLimiteVotosPorCargo(cargoId);
+            throw new IllegalStateException(
+                    String.format("Membro já atingiu o limite de %d votos para este cargo", limite)
+            );
+        }
+
+        if (!temCandidatosParaCargo(cargoId)) {
+            throw new IllegalStateException("Não há candidatos aprovados para este cargo");
+        }
+    }
+
+    /**
+     * Retorna informações de limite para um membro em um cargo
+     */
+    public LimiteVotacaoInfo getLimiteVotacaoParaMembro(UUID membroId, UUID cargoId) {
+        int votosJaDados = contarVotosDoMembroNoCargo(membroId, cargoId);
+        Integer limiteVotos = getLimiteVotosPorCargo(cargoId);
+        List<UUID> candidatosJaVotados = getCandidatosJaVotadosPeloMembroNoCargo(membroId, cargoId);
+
+        return new LimiteVotacaoInfo(
+                cargoId,
+                limiteVotos,
+                votosJaDados,
+                candidatosJaVotados,
+                membroPodeVotarMaisNoCargo(membroId, cargoId)
+        );
     }
 
     /**
@@ -214,14 +324,82 @@ public class Eleicao {
     }
 
     /**
-     * Verifica se um membro já votou nesta eleição
+     * Retorna total de candidatos aprovados
      */
-    public boolean membroJaVotou(UUID membroId) {
-        return votos != null && votos.stream()
-                .anyMatch(voto -> voto.getMembro().getId().equals(membroId));
+    public int getTotalCandidatosAprovados() {
+        return getCandidatosAprovados().size();
     }
 
-    // === MÉTODOS UTILITÁRIOS ===
+    /**
+     * Retorna total de cargos com candidatos
+     */
+    public int getTotalCargosComCandidatos() {
+        return getCargosComCandidatos().size();
+    }
+
+    /**
+     * ✅ Configura vagas para múltiplos cargos
+     */
+    public void configurarVagasMultiplosCargos(Map<UUID, Integer> novasVagas) {
+        if (novasVagas != null) {
+            // Validar todas as vagas primeiro
+            novasVagas.forEach((cargoId, vagas) -> {
+                if (vagas == null || vagas < 0) {
+                    throw new IllegalArgumentException("Número de vagas deve ser maior ou igual a zero para cargo: " + cargoId);
+                }
+            });
+
+            // Se todas são válidas, aplicar
+            this.vagasPorCargo.clear();
+            this.vagasPorCargo.putAll(novasVagas);
+        }
+    }
+
+    /**
+     * Verifica se tem candidatos (independente do status)
+     */
+    public boolean temCandidatos() {
+        return candidatos != null && !candidatos.isEmpty();
+    }
+
+    /**
+     * Calcula duração da eleição em horas
+     */
+    public long getDuracaoEmHoras() {
+        if (dataInicio == null || dataFim == null) {
+            return 0;
+        }
+        return java.time.Duration.between(dataInicio, dataFim).toHours();
+    }
+
+    // Classe helper para retorno de informações
+    public static class LimiteVotacaoInfo {
+        public final UUID cargoId;
+        public final Integer limiteVotos;
+        public final Integer votosJaDados;
+        public final List<UUID> candidatosJaVotados;
+        public final boolean podeVotarMais;
+
+        public LimiteVotacaoInfo(UUID cargoId, Integer limiteVotos, Integer votosJaDados,
+                                 List<UUID> candidatosJaVotados, boolean podeVotarMais) {
+            this.cargoId = cargoId;
+            this.limiteVotos = limiteVotos;
+            this.votosJaDados = votosJaDados;
+            this.candidatosJaVotados = candidatosJaVotados;
+            this.podeVotarMais = podeVotarMais;
+        }
+
+        public int getVotosRestantes() {
+            return Math.max(0, (limiteVotos != null ? limiteVotos : 0) - (votosJaDados != null ? votosJaDados : 0));
+        }
+    }
+
+    /**
+     * Incrementa o contador de votantes
+     */
+    public void incrementarVotantes() {
+        this.totalVotantes++;
+    }
 
     /**
      * Retorna descrição do status atual
@@ -258,87 +436,9 @@ public class Eleicao {
     }
 
     /**
-     * Calcula duração da eleição em horas
-     */
-    public long getDuracaoEmHoras() {
-        if (dataInicio == null || dataFim == null) {
-            return 0;
-        }
-        return java.time.Duration.between(dataInicio, dataFim).toHours();
-    }
-
-    /**
-     * Retorna cargos que têm candidatos aprovados nesta eleição
-     */
-    public List<Cargo> getCargosComCandidatos() {
-        if (candidatos == null) {
-            return new ArrayList<>();
-        }
-
-        return candidatos.stream()
-                .filter(candidato -> candidato.getAprovado() != null && candidato.getAprovado())
-                .map(Candidato::getCargoPretendido)
-                .filter(cargo -> cargo != null)
-                .distinct()
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Retorna total de cargos com candidatos
-     */
-    public int getTotalCargosComCandidatos() {
-        return getCargosComCandidatos().size();
-    }
-
-    /**
-     * Retorna candidatos aprovados
-     */
-    public List<Candidato> getCandidatosAprovados() {
-        if (candidatos == null) {
-            return new ArrayList<>();
-        }
-
-        return candidatos.stream()
-                .filter(candidato -> candidato.getAprovado() != null && candidato.getAprovado())
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Retorna total de candidatos aprovados
-     */
-    public int getTotalCandidatosAprovados() {
-        return getCandidatosAprovados().size();
-    }
-
-    /**
-     * Retorna candidatos por cargo específico
-     */
-    public List<Candidato> getCandidatosPorCargo(UUID cargoId) {
-        if (candidatos == null || cargoId == null) {
-            return new ArrayList<>();
-        }
-
-        return candidatos.stream()
-                .filter(candidato -> candidato.getAprovado() != null && candidato.getAprovado())
-                .filter(candidato -> candidato.getCargoPretendido() != null)
-                .filter(candidato -> cargoId.equals(candidato.getCargoPretendido().getId()))
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Verifica se tem candidatos para um cargo específico
-     */
-    public boolean temCandidatosParaCargo(UUID cargoId) {
-        return !getCandidatosPorCargo(cargoId).isEmpty();
-    }
-
-    // === VALIDAÇÕES PRIVADAS ===
-
-    /**
      * Valida se a eleição pode ser ativada
      */
     private void validarParaAtivacao() {
-        // ✅ CORRIGIDO: Validação baseada em candidatos aprovados, não em cargos
         if (!temCandidatosAprovados()) {
             throw new IllegalStateException("Não é possível ativar eleição sem candidatos aprovados");
         }
@@ -355,26 +455,34 @@ public class Eleicao {
             throw new IllegalStateException("Total de elegíveis deve ser informado e maior que zero");
         }
 
-        // Validar se há pelo menos um cargo com candidatos
         if (getCargosComCandidatos().isEmpty()) {
             throw new IllegalStateException("Deve haver pelo menos um cargo com candidatos aprovados");
         }
     }
 
-    // === MÉTODOS AUXILIARES PARA NORMALIZAÇÃO ===
-
     /**
-     * Normaliza o nome da eleição
+     * Atualiza informações básicas da eleição
      */
-    public void normalizarNome() {
-        if (this.nome != null) {
-            this.nome = this.nome.trim().replaceAll("\\s+", " ");
-        }
+    public void updateBasicInfo(String nome, String descricao, LocalDateTime dataInicio,
+                                LocalDateTime dataFim, String instrucoesVotacao) {
+        this.nome = nome;
+        this.descricao = descricao;
+        this.dataInicio = dataInicio;
+        this.dataFim = dataFim;
+        this.instrucoesVotacao = instrucoesVotacao;
     }
 
     /**
-     * Valida dados básicos da eleição
+     * Atualiza configurações da eleição
      */
+    public void updateConfiguracoes(Boolean permiteVotoBranco, Boolean permiteVotoNulo,
+                                    Boolean exibeResultadosParciais, Integer totalElegiveis) {
+        this.permiteVotoBranco = permiteVotoBranco;
+        this.permiteVotoNulo = permiteVotoNulo;
+        this.exibeResultadosParciais = exibeResultadosParciais;
+        this.totalElegiveis = totalElegiveis;
+    }
+
     public void validarDados() {
         if (nome == null || nome.trim().isEmpty()) {
             throw new IllegalArgumentException("Nome da eleição é obrigatório");
@@ -391,5 +499,26 @@ public class Eleicao {
         if (instrucoesVotacao != null && instrucoesVotacao.length() > 2000) {
             throw new IllegalArgumentException("Instruções de votação deve ter no máximo 2000 caracteres");
         }
+
+        if (dataInicio != null && dataFim != null && dataInicio.isAfter(dataFim)) {
+            throw new IllegalArgumentException("Data de início deve ser anterior à data de fim");
+        }
+
+        if (totalElegiveis != null && totalElegiveis <= 0) {
+            throw new IllegalArgumentException("Total de elegíveis deve ser positivo");
+        }
+    }
+
+    public void normalizarNome() {
+        if (this.nome != null) {
+            // Remove espaços no início e fim, e substitui múltiplos espaços por um único espaço
+            this.nome = this.nome.trim().replaceAll("\\s+", " ");
+        }
+    }
+
+    @Override
+    public String toString() {
+        return String.format("Eleicao{id=%s, nome='%s', ativa=%s, status='%s'}",
+                id, nome, ativa, getStatusDescricao());
     }
 }

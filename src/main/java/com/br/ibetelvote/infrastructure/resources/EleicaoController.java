@@ -1,6 +1,7 @@
 package com.br.ibetelvote.infrastructure.resources;
 
 import com.br.ibetelvote.application.eleicao.dto.*;
+import com.br.ibetelvote.application.services.EleicaoConfigService;
 import com.br.ibetelvote.domain.services.EleicaoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -30,6 +31,7 @@ import java.util.UUID;
 public class EleicaoController {
 
     private final EleicaoService eleicaoService;
+    private final EleicaoConfigService eleicaoConfigService;
 
     @PostMapping
     @PreAuthorize("hasRole('ADMINISTRADOR')")
@@ -129,36 +131,6 @@ public class EleicaoController {
     public ResponseEntity<Void> deleteEleicao(@PathVariable UUID id) {
         eleicaoService.deleteEleicao(id);
         return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/{id}/ativar")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
-    @Operation(summary = "Ativar eleição",
-            description = "Ativa uma eleição para votação. Valida se há candidatos aprovados e se não há conflito com outras eleições ativas.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Eleição ativada com sucesso"),
-            @ApiResponse(responseCode = "400", description = "Eleição não pode ser ativada - verificar validações"),
-            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
-            @ApiResponse(responseCode = "403", description = "Acesso negado"),
-            @ApiResponse(responseCode = "404", description = "Eleição não encontrada")
-    })
-    public ResponseEntity<Void> ativarEleicao(@PathVariable UUID id) {
-        eleicaoService.ativarEleicao(id);
-        return ResponseEntity.ok().build();
-    }
-
-    @PostMapping("/{id}/desativar")
-    @PreAuthorize("hasRole('ADMINISTRADOR')")
-    @Operation(summary = "Desativar eleição", description = "Desativa uma eleição")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Eleição desativada com sucesso"),
-            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
-            @ApiResponse(responseCode = "403", description = "Acesso negado"),
-            @ApiResponse(responseCode = "404", description = "Eleição não encontrada")
-    })
-    public ResponseEntity<Void> desativarEleicao(@PathVariable UUID id) {
-        eleicaoService.desativarEleicao(id);
-        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{id}/encerrar")
@@ -414,6 +386,130 @@ public class EleicaoController {
         List<EleicaoListResponse> eleicoes = eleicaoService.buscarEleicoesComFiltros(filter);
         return ResponseEntity.ok(eleicoes);
     }
+
+    // === CONFIGURAÇÃO DE VAGAS POR CARGO ===
+
+    @PostMapping("/{id}/configurar-vagas")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @Operation(summary = "Configurar vagas por cargo",
+            description = "Configura quantas vagas cada cargo tem na eleição. Necessário para definir limite de votos.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Vagas configuradas com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos ou eleição em votação"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado"),
+            @ApiResponse(responseCode = "404", description = "Eleição não encontrada")
+    })
+    public ResponseEntity<VagasEleicaoResponse> configurarVagas(
+            @Parameter(description = "ID da eleição")
+            @PathVariable UUID id,
+            @Valid @RequestBody ConfigurarVagasEleicaoRequest request) {
+
+        log.info("Configurando vagas para eleição: {}", id);
+
+        VagasEleicaoResponse response = eleicaoConfigService.configurarVagasPorCargo(id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{id}/vagas")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO')")
+    @Operation(summary = "Consultar configuração de vagas",
+            description = "Retorna a configuração atual de vagas por cargo da eleição")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Configuração consultada com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado"),
+            @ApiResponse(responseCode = "404", description = "Eleição não encontrada")
+    })
+    public ResponseEntity<VagasEleicaoResponse> consultarVagas(
+            @Parameter(description = "ID da eleição")
+            @PathVariable UUID id) {
+
+        VagasEleicaoResponse response = eleicaoConfigService.consultarVagasPorCargo(id);
+        return ResponseEntity.ok(response);
+    }
+
+    // === CONSULTA DE LIMITES PARA VOTAÇÃO ===
+
+    @GetMapping("/{eleicaoId}/limite-votacao/{membroId}/{cargoId}")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'UTILIZADOR_PRO', 'MEMBRO')")
+    @Operation(summary = "Consultar limite de votação",
+            description = "Retorna quantos votos o membro ainda pode dar para o cargo específico")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Limite consultado com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "404", description = "Eleição, membro ou cargo não encontrado")
+    })
+    public ResponseEntity<LimiteVotacaoResponse> consultarLimiteVotacao(
+            @Parameter(description = "ID da eleição")
+            @PathVariable UUID eleicaoId,
+            @Parameter(description = "ID do membro")
+            @PathVariable UUID membroId,
+            @Parameter(description = "ID do cargo")
+            @PathVariable UUID cargoId) {
+
+        LimiteVotacaoResponse response = eleicaoConfigService.consultarLimiteVotacao(
+                eleicaoId, membroId, cargoId
+        );
+        return ResponseEntity.ok(response);
+    }
+
+    // === VALIDAÇÃO DE CONFIGURAÇÃO COMPLETA ===
+
+    @GetMapping("/{id}/validar-configuracao")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @Operation(summary = "Validar configuração completa",
+            description = "Verifica se a eleição está completamente configurada e pronta para ativação")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Validação realizada"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado"),
+            @ApiResponse(responseCode = "404", description = "Eleição não encontrada")
+    })
+    public ResponseEntity<Boolean> validarConfiguracaoCompleta(
+            @Parameter(description = "ID da eleição")
+            @PathVariable UUID id) {
+
+        boolean configuracaoCompleta = eleicaoConfigService.validarConfiguracaoCompleta(id);
+        return ResponseEntity.ok(configuracaoCompleta);
+    }
+
+    @PostMapping("/{id}/ativar")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @Operation(summary = "Ativar eleição",
+            description = "Ativa uma eleição para votação. Valida configuração completa incluindo vagas por cargo.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Eleição ativada com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Eleição não pode ser ativada - verificar configurações"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado"),
+            @ApiResponse(responseCode = "404", description = "Eleição não encontrada")
+    })
+    public ResponseEntity<Void> ativarEleicao(@PathVariable UUID id) {
+        log.info("Ativando eleição com validação completa: {}", id);
+
+        eleicaoConfigService.ativarEleicao(id);
+        return ResponseEntity.ok().build();
+    }
+
+    // SUBSTITUIR O MÉTODO desativarEleicao EXISTENTE POR:
+    @PostMapping("/{id}/desativar")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    @Operation(summary = "Desativar eleição",
+            description = "Desativa uma eleição")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Eleição desativada com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Token inválido ou expirado"),
+            @ApiResponse(responseCode = "403", description = "Acesso negado"),
+            @ApiResponse(responseCode = "404", description = "Eleição não encontrada")
+    })
+    public ResponseEntity<Void> desativarEleicao(@PathVariable UUID id) {
+        log.info("Desativando eleição: {}", id);
+
+        eleicaoConfigService.desativarEleicao(id);
+        return ResponseEntity.ok().build();
+    }
+
 
     // === EXCEPTION HANDLERS ===
 

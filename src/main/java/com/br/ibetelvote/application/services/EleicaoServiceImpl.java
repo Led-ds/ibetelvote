@@ -5,8 +5,10 @@ import com.br.ibetelvote.application.mapper.EleicaoMapper;
 import com.br.ibetelvote.domain.entities.Eleicao;
 import com.br.ibetelvote.domain.services.EleicaoService;
 import com.br.ibetelvote.infrastructure.repositories.EleicaoJpaRepository;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.service.spi.ServiceException;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -28,6 +30,7 @@ public class EleicaoServiceImpl implements EleicaoService {
 
     private final EleicaoJpaRepository eleicaoRepository;
     private final EleicaoMapper eleicaoMapper;
+    private final EleicaoConfigService eleicaoConfigService;
 
     @Override
     @CacheEvict(value = {"eleicoes", "eleicao-stats", "eleicao-ativa"}, allEntries = true)
@@ -129,43 +132,53 @@ public class EleicaoServiceImpl implements EleicaoService {
     }
 
     @Override
-    @CacheEvict(value = {"eleicoes", "eleicao-stats", "eleicao-ativa"}, allEntries = true)
-    public void ativarEleicao(UUID id) {
-        log.info("Ativando eleição ID: {}", id);
+    @Transactional(readOnly = true)
+    public EleicaoResponse buscarDetalhada(UUID eleicaoId) {
+        log.info("Buscando eleição detalhada: {}", eleicaoId);
 
-        Eleicao eleicao = eleicaoRepository.findByIdWithCandidatos(id)
-                .orElseThrow(() -> new IllegalArgumentException("Eleição não encontrada com ID: " + id));
+        Eleicao eleicao = eleicaoRepository.findByIdWithCandidatos(eleicaoId)
+                .orElseThrow(() -> new EntityNotFoundException("Eleição não encontrada: " + eleicaoId));
 
-        eleicaoRepository.findEleicaoAtivaComCandidatos().ifPresent(eleicaoAtiva -> {
-            if (!eleicaoAtiva.getId().equals(id)) {
-                throw new IllegalStateException("Já existe uma eleição ativa com candidatos. Desative-a antes de ativar outra.");
-            }
-        });
-
-        // Verificar conflito de período
-        if (existeEleicaoAtivaNoMesmoPeriodo(eleicao.getDataInicio(), eleicao.getDataFim(), id)) {
-            throw new IllegalStateException("Há conflito de período com outra eleição ativa");
-        }
-
-        eleicao.activate();
-        eleicaoRepository.save(eleicao);
-
-        log.info("Eleição ativada com sucesso - ID: {}, Total candidatos aprovados: {}",
-                id, eleicao.getTotalCandidatosAprovados());
+        // Usar mapper atualizado que inclui configuração de vagas
+        return eleicaoMapper.toResponse(eleicao);
     }
 
     @Override
-    @CacheEvict(value = {"eleicoes", "eleicao-stats", "eleicao-ativa"}, allEntries = true)
-    public void desativarEleicao(UUID id) {
-        log.info("Desativando eleição ID: {}", id);
+    public EleicaoResponse ativarEleicao(UUID eleicaoId) {
+        log.info("Ativando eleição: {}", eleicaoId);
 
-        Eleicao eleicao = eleicaoRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Eleição não encontrada com ID: " + id));
+        try {
+            // Usar o service de configuração para ativação
+            eleicaoConfigService.ativarEleicao(eleicaoId);
 
-        eleicao.deactivate();
-        eleicaoRepository.save(eleicao);
+            // Buscar eleição atualizada
+            Eleicao eleicao = eleicaoRepository.findById(eleicaoId)
+                    .orElseThrow(() -> new EntityNotFoundException("Eleição não encontrada: " + eleicaoId));
 
-        log.info("Eleição desativada com sucesso - ID: {}", id);
+            return eleicaoMapper.toResponse(eleicao);
+
+        } catch (Exception e) {
+            log.error("Erro ao ativar eleição {}: {}", eleicaoId, e.getMessage());
+            throw new ServiceException("Erro ao ativar eleição: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public EleicaoResponse desativarEleicao(UUID eleicaoId) {
+        log.info("Desativando eleição: {}", eleicaoId);
+
+        try {
+            eleicaoConfigService.desativarEleicao(eleicaoId);
+
+            Eleicao eleicao = eleicaoRepository.findById(eleicaoId)
+                    .orElseThrow(() -> new EntityNotFoundException("Eleição não encontrada: " + eleicaoId));
+
+            return eleicaoMapper.toResponse(eleicao);
+
+        } catch (Exception e) {
+            log.error("Erro ao desativar eleição {}: {}", eleicaoId, e.getMessage());
+            throw new ServiceException("Erro ao desativar eleição: " + e.getMessage());
+        }
     }
 
     @Override
@@ -406,5 +419,14 @@ public class EleicaoServiceImpl implements EleicaoService {
                 filter.getStatus() != null ||
                 filter.getTemCandidatos() != null ||
                 filter.getTemCandidatosAprovados() != null;
+    }
+
+    private void validarEleicaoParaOperacao(Eleicao eleicao, String operacao) {
+        if (eleicao == null) {
+            throw new IllegalArgumentException("Eleição não pode ser nula");
+        }
+
+        // Validações específicas por operação podem ser adicionadas
+        log.debug("Eleição {} validada para operação: {}", eleicao.getId(), operacao);
     }
 }
