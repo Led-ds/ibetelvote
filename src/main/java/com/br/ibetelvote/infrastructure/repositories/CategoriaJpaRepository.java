@@ -24,7 +24,7 @@ public interface CategoriaJpaRepository extends JpaRepository<Categoria, UUID>, 
     @Query("SELECT CASE WHEN COUNT(c) > 0 THEN true ELSE false END FROM Categoria c WHERE UPPER(TRIM(CAST(c.nome AS string))) = UPPER(TRIM(:nome))")
     boolean existsByNome(@Param("nome") String nome);
 
-    @Query("SELECT c FROM Categoria c WHERE UPPER(CAST(c.nome AS string)) LIKE UPPER(CONCAT('%', :nome, '%'))")
+    @Query("SELECT c FROM Categoria c WHERE UPPER(c.nome) LIKE UPPER(CONCAT('%', :nome, '%'))")
     List<Categoria> findByNomeContainingIgnoreCase(@Param("nome") String nome);
 
     @Query("SELECT CASE WHEN COUNT(c) > 0 THEN true ELSE false END FROM Categoria c WHERE UPPER(TRIM(CAST(c.nome AS string))) = UPPER(TRIM(:nome)) AND c.id != :id")
@@ -145,7 +145,7 @@ public interface CategoriaJpaRepository extends JpaRepository<Categoria, UUID>, 
      */
     @Query("""
             SELECT c FROM Categoria c WHERE
-            (:nome IS NULL OR UPPER(CAST(c.nome AS string)) LIKE UPPER(CONCAT('%', :nome, '%'))) AND
+            (:nome IS NULL OR UPPER(c.nome) LIKE UPPER(CONCAT('%', :nome, '%'))) AND
             (:ativo IS NULL OR c.ativo = :ativo) AND
             (:ordemMin IS NULL OR c.ordemExibicao >= :ordemMin) AND
             (:ordemMax IS NULL OR c.ordemExibicao <= :ordemMax)

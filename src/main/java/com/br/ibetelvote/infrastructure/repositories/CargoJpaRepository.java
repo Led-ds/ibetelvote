@@ -30,13 +30,13 @@ public interface CargoJpaRepository extends JpaRepository<Cargo, UUID>, CargoRep
     @Query("SELECT CASE WHEN COUNT(c) > 0 THEN true ELSE false END FROM Cargo c WHERE UPPER(TRIM(CAST(c.nome AS string))) = UPPER(TRIM(:nome))")
     boolean existsByNome(@Param("nome") String nome);
 
-    @Query("SELECT c FROM Cargo c WHERE UPPER(CAST(c.nome AS string)) LIKE UPPER(CONCAT('%', :nome, '%'))")
+    @Query("SELECT c FROM Cargo c WHERE UPPER(c.nome) LIKE UPPER(CONCAT('%', :nome, '%'))")
     List<Cargo> findByNomeContainingIgnoreCase(@Param("nome") String nome);
 
     @Query("SELECT CASE WHEN COUNT(c) > 0 THEN true ELSE false END FROM Cargo c WHERE UPPER(TRIM(CAST(c.nome AS string))) = UPPER(TRIM(:nome)) AND c.id != :id")
     boolean existsByNomeAndIdNot(@Param("nome") String nome, @Param("id") UUID id);
 
-    @Query("SELECT CASE WHEN COUNT(c) > 0 THEN true ELSE false END FROM Cargo c WHERE UPPER(CAST(c.nome AS string)) = UPPER(:nome) AND c.ativo = true")
+    @Query("SELECT CASE WHEN COUNT(c) > 0 THEN true ELSE false END FROM Cargo c WHERE UPPER(c.nome) = UPPER(:nome) AND c.ativo = true")
     boolean existsCargoAtivoByNome(@Param("nome") String nome);
 
     // === CONSULTAS POR STATUS ===
@@ -305,17 +305,17 @@ public interface CargoJpaRepository extends JpaRepository<Cargo, UUID>, CargoRep
     /**
      * Busca com filtros múltiplos
      */
-    @Query("""
-            SELECT c FROM Cargo c 
-            JOIN c.categoria cat
-            WHERE
-            (:nome IS NULL OR UPPER(CAST(c.nome AS string)) LIKE UPPER(CONCAT('%', :nome, '%'))) AND
-            (:categoriaId IS NULL OR c.categoria.id = :categoriaId) AND
-            (:hierarquia IS NULL OR c.hierarquia = :hierarquia) AND
-            (:ativo IS NULL OR c.ativo = :ativo) AND
-            (:disponivelEleicao IS NULL OR c.disponivelEleicao = :disponivelEleicao)
-            ORDER BY cat.ordemExibicao, c.ordemPrecedencia ASC NULLS LAST, c.nome
-            """)
+    @Query(value = """
+        SELECT c.* FROM cargos c 
+        JOIN categorias cat ON cat.id = c.categoria_id
+        WHERE
+        (:nome IS NULL OR LOWER(c.nome) ILIKE LOWER(CONCAT('%', :nome, '%'))) AND
+        (:categoriaId IS NULL OR c.categoria_id = :categoriaId) AND
+        (:hierarquia IS NULL OR c.hierarquia = :hierarquia) AND
+        (:ativo IS NULL OR c.ativo = :ativo) AND
+        (:disponivelEleicao IS NULL OR c.disponivel_eleicao = :disponivelEleicao)
+        ORDER BY cat.ordem_exibicao, c.ordem_precedencia ASC NULLS LAST, c.nome
+        """, nativeQuery = true)
     Page<Cargo> findByFiltros(@Param("nome") String nome,
                               @Param("categoriaId") UUID categoriaId,
                               @Param("hierarquia") HierarquiaCargo hierarquia,
