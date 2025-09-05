@@ -9,6 +9,8 @@ import com.br.ibetelvote.domain.entities.Eleicao;
 import org.mapstruct.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Mapper(
@@ -250,5 +252,50 @@ public interface EleicaoMapper {
             return String.format("Eleição '%s' não pode ser ativada. Verifique os motivos de impedimento.",
                     eleicao.getNome());
         }
+    }
+
+    default VagasEleicaoResponse toVagasResponse(Eleicao eleicao) {
+        if (eleicao == null) return null;
+
+        List<VagasEleicaoResponse.VagaCargoInfo> vagasInfo = eleicao.getCargosComCandidatos()
+                .stream()
+                .map(cargo -> VagasEleicaoResponse.VagaCargoInfo.builder()
+                        .cargoId(cargo.getId())
+                        .nomeCargo(cargo.getNome())
+                        .numeroVagas(eleicao.getLimiteVotosPorCargo(cargo.getId()))
+                        .temCandidatos(eleicao.temCandidatosParaCargo(cargo.getId()))
+                        .totalCandidatos(eleicao.getCandidatosPorCargo(cargo.getId()).size())
+                        .build())
+                .collect(Collectors.toList());
+
+        return VagasEleicaoResponse.builder()
+                .eleicaoId(eleicao.getId())
+                .nomeEleicao(eleicao.getNome())
+                .vagasConfiguradas(vagasInfo)
+                .totalVagasConfiguradas(vagasInfo.stream()
+                        .mapToInt(VagasEleicaoResponse.VagaCargoInfo::getNumeroVagas)
+                        .sum())
+                .build();
+    }
+
+    default LimiteVotacaoResponse toLimiteVotacaoResponse(Eleicao.LimiteVotacaoInfo info, String nomeCargo) {
+        if (info == null) return null;
+
+        return LimiteVotacaoResponse.builder()
+                .cargoId(info.cargoId)
+                .nomeCargo(nomeCargo)
+                .limiteVotos(info.limiteVotos)
+                .votosJaDados(info.votosJaDados)
+                .votosRestantes(info.getVotosRestantes())
+                .podeVotarMais(info.podeVotarMais)
+                .candidatosJaVotados(info.candidatosJaVotados)
+                .build();
+    }
+
+    default void aplicarConfigVagas(Eleicao eleicao, ConfigurarVagasEleicaoRequest request) {
+        if (eleicao == null || request == null) return;
+
+        Map<UUID, Integer> vagasMap = request.toVagasMap();
+        eleicao.configurarVagasMultiplosCargos(vagasMap);
     }
 }

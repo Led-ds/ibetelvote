@@ -17,13 +17,12 @@ import java.util.UUID;
                 @Index(name = "idx_voto_candidato_id", columnList = "candidato_id"),
                 @Index(name = "idx_voto_membro_id", columnList = "membro_id"),
                 @Index(name = "idx_voto_cargo_pretendido_id", columnList = "cargo_pretendido_id"),
-                @Index(name = "idx_voto_data", columnList = "data_voto"),
-                @Index(name = "idx_voto_hash", columnList = "hash_voto"),
-                @Index(name = "idx_voto_tipo", columnList = "tipo_voto")
+                @Index(name = "idx_voto_membro_eleicao", columnList = "membro_id, eleicao_id"),
+                @Index(name = "idx_voto_cargo_eleicao", columnList = "cargo_pretendido_id, eleicao_id")
         },
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_voto_membro_cargo_eleicao",
-                        columnNames = {"membro_id", "cargo_pretendido_id", "eleicao_id"})
+                @UniqueConstraint(name = "uk_voto_membro_candidato",
+                        columnNames = {"membro_id", "candidato_id"})
         }
 )
 @Getter
@@ -82,6 +81,14 @@ public class Voto {
 
     // Factory Methods
     public static Voto criarVotoValido(Membro membro, Eleicao eleicao, Candidato candidato) {
+        if (!eleicao.isVotacaoAberta()) {
+            throw new IllegalStateException("Votação não está aberta");
+        }
+
+        if (!candidato.isAprovado() || !candidato.isAtivo()) {
+            throw new IllegalStateException("Candidato não está disponível para votação");
+        }
+
         return Voto.builder()
                 .membro(membro)
                 .eleicao(eleicao)
@@ -206,6 +213,13 @@ public class Voto {
                Objects.equals(this.eleicao, eleicao);
     }
 
+    @PrePersist
+    @PreUpdate
+    public void validarAntesDePeristir() {
+        validarConsistencia();
+        validarCandidatoEleicao();
+    }
+
     // Validation Methods
     public void validarConsistencia() {
         if (membro == null) {
@@ -221,9 +235,19 @@ public class Voto {
         if (TipoVoto.CANDIDATO.equals(tipoVoto) && candidato == null) {
             throw new IllegalStateException("Voto em candidato deve ter candidato associado");
         }
+    }
 
-        if (!TipoVoto.CANDIDATO.equals(tipoVoto) && candidato != null) {
-            throw new IllegalStateException("Voto branco/nulo não deve ter candidato");
+    public void validarCandidatoEleicao() {
+        if (candidato != null) {
+            // Candidato deve pertencer à mesma eleição
+            if (!Objects.equals(candidato.getEleicaoId(), eleicao.getId())) {
+                throw new IllegalStateException("Candidato não pertence à eleição especificada");
+            }
+
+            // Candidato deve pertencer ao cargo especificado
+            if (!Objects.equals(candidato.getCargoPretendidoId(), cargoPretendido.getId())) {
+                throw new IllegalStateException("Candidato não pertence ao cargo especificado");
+            }
         }
     }
 
@@ -238,6 +262,10 @@ public class Voto {
     public void validarVotoCompleto() {
         validarConsistencia();
         validarCandidatoCompativel();
+    }
+
+    public boolean isVotoParaCandidato() {
+        return TipoVoto.CANDIDATO.equals(tipoVoto) && candidato != null;
     }
 
     // Utility Methods

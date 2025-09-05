@@ -161,6 +161,9 @@ public interface VotoJpaRepository extends JpaRepository<Voto, UUID>,
      */
     long countByCandidatoId(UUID candidatoId);
 
+    // Adicionar no VotoJpaRepository:
+    boolean existsByMembroIdAndCandidatoId(UUID membroId, UUID candidatoId);
+
     /**
      * Conta membros únicos que votaram na eleição
      */
