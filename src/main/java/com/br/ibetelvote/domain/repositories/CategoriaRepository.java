@@ -1,61 +1,36 @@
 package com.br.ibetelvote.domain.repositories;
 
 import com.br.ibetelvote.domain.entities.Categoria;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Interface de domínio para CategoriaRepository.
+ * Contém apenas métodos específicos de negócio.
+ * Métodos CRUD básicos são fornecidos automaticamente pelo JpaRepository.
+ * Lógicas complexas são implementadas via Specifications no Service.
+ */
 public interface CategoriaRepository {
 
-
-    List<Categoria> findAll();
-    Page<Categoria> findAll(Pageable pageable);
-    void deleteById(UUID id);
-    long count();
-
-    // === CONSULTAS POR NOME ===
+    // === CONSULTAS ESPECÍFICAS POR ATRIBUTOS ===
     Optional<Categoria> findByNome(String nome);
     boolean existsByNome(String nome);
-    List<Categoria> findByNomeContainingIgnoreCase(String nome);
-    boolean existsByNomeAndIdNot(String nome, UUID id);
-
-    // === CONSULTAS POR STATUS ===
     List<Categoria> findByAtivoTrue();
-    List<Categoria> findByAtivoFalse();
-    Page<Categoria> findByAtivo(Boolean ativo, Pageable pageable);
-    long countByAtivo(Boolean ativo);
 
-    // === CONSULTAS ORDENADAS ===
+    // === CONSULTAS ORDENADAS ESPECÍFICAS ===
     List<Categoria> findAllByOrderByNomeAsc();
     List<Categoria> findAllByOrderByOrdemExibicaoAsc();
     List<Categoria> findByAtivoTrueOrderByOrdemExibicaoAsc();
-    Page<Categoria> findByAtivoTrueOrderByOrdemExibicaoAsc(Pageable pageable);
 
-    // === CONSULTAS ESPECÍFICAS ===
-    List<Categoria> findCategoriasComCargos();
-    List<Categoria> findCategoriasSemCargos();
-    List<Categoria> findCategoriasComCargosAtivos();
-    List<Categoria> findCategoriasComCargosDisponiveis();
+    // === VALIDAÇÕES ESPECÍFICAS DE NEGÓCIO ===
+    boolean existsByNomeAndIdNot(String nome, UUID id);
+    boolean existsByOrdemExibicao(Integer ordem);
+    boolean canDeleteCategoria(UUID id);
+
+    // === ORDEM DE EXIBIÇÃO ESPECÍFICA ===
+    Optional<Categoria> findByOrdemExibicao(Integer ordem);
     Integer findNextOrdemExibicao();
 
-    boolean existsByOrdemExibicao(Integer ordem);
-    boolean existsByOrdemExibicaoAndIdNot(Integer ordem, UUID id);
-
-    // === CONSULTAS PARA RELATÓRIOS ===
-    List<Categoria> findTop10ByOrderByCreatedAtDesc();
-    List<Categoria> findCategoriasComMaisCargos();
-    List<Object[]> countCargosPorCategoria();
-    List<Object[]> getEstatisticasCategorias();
-
-    // === CONSULTAS PARA VALIDAÇÃO ===
-    boolean canDeleteCategoria(UUID id);
-    List<Categoria> findCategoriasNaoRemovíveis();
-    Optional<Categoria> findByNomeIgnoreCaseAndTrimmed(String nome);
-
-    // === CONSULTAS COM FILTROS ===
-    Page<Categoria> findByFiltros(String nome, Boolean ativo, Integer ordemMin, Integer ordemMax, Pageable pageable);
-    List<Categoria> findCategoriasComCargosNoPeriodo(java.time.LocalDateTime inicio, java.time.LocalDateTime fim);
 }

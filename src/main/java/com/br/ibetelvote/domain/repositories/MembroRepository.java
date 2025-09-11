@@ -1,77 +1,45 @@
 package com.br.ibetelvote.domain.repositories;
 
 import com.br.ibetelvote.domain.entities.Membro;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Interface de domínio para MembroRepository.
+ * Contém apenas métodos específicos de negócio.
+ * Métodos CRUD básicos são fornecidos automaticamente pelo JpaRepository.
+ * Lógicas complexas são implementadas via Specifications no Service.
+ */
 public interface MembroRepository {
 
-    // === OPERAÇÕES BÁSICAS ===
-    void deleteById(UUID id);
-    long count();
-
-    // === CONSULTAS POR STATUS ===
-    List<Membro> findByAtivoTrue();
-    List<Membro> findByAtivoFalse();
-    Page<Membro> findByAtivo(Boolean ativo, Pageable pageable);
-    long countByAtivo(Boolean ativo);
-
-    // === CONSULTAS POR DADOS PESSOAIS ===
+    // === CONSULTAS ESPECÍFICAS POR ATRIBUTOS ÚNICOS ===
     Optional<Membro> findByEmail(String email);
     Optional<Membro> findByCpf(String cpf);
+    Optional<Membro> findByUserId(UUID userId);
     boolean existsByEmail(String email);
     boolean existsByCpf(String cpf);
-    List<Membro> findByNomeContainingIgnoreCase(String nome);
-
-    // === CONSULTAS POR CARGO ===
-    List<Membro> findByCargoAtualId(UUID cargoId);
-    List<Membro> findByCargoAtualIdIsNull();
-    List<Membro> findByCargoAtualIdIsNotNull();
-    Page<Membro> findByCargoAtualId(UUID cargoId, Pageable pageable);
-    long countByCargoAtualId(UUID cargoId);
-
-    // === CONSULTAS POR USER ===
-    Optional<Membro> findByUserId(UUID userId);
-    List<Membro> findByUserIdIsNull();
-    List<Membro> findByUserIdIsNotNull();
     boolean existsByUserId(UUID userId);
 
-    // === CONSULTAS ORDENADAS ===
+    // === CONSULTAS ESPECÍFICAS POR STATUS ===
+    List<Membro> findByAtivoTrue();
+    List<Membro> findByAtivoFalse();
+    long countByAtivo(Boolean ativo);
+
+    // === CONSULTAS ESPECÍFICAS POR RELACIONAMENTOS ===
+    List<Membro> findByCargoAtualId(UUID cargoId);
+    long countByCargoAtualId(UUID cargoId);
+
+    // === CONSULTAS ORDENADAS ESPECÍFICAS ===
     List<Membro> findAllByOrderByNomeAsc();
     List<Membro> findByAtivoTrueOrderByNomeAsc();
-    Page<Membro> findByAtivoTrueOrderByNomeAsc(Pageable pageable);
 
-    // === CONSULTAS PARA VALIDAÇÃO ===
+    // === VALIDAÇÕES ESPECÍFICAS DE NEGÓCIO ===
     boolean existsByEmailAndIdNot(String email, UUID id);
     boolean existsByCpfAndIdNot(String cpf, UUID id);
 
-    // === CONSULTAS CUSTOMIZADAS ===
-    /**
-     * Busca membros aptos para votação (ativos com informações completas)
-     */
-    List<Membro> findMembrosAptosParaVotacao();
+    // === BUSCA ESPECÍFICA ===
+    List<Membro> findByNomeContainingIgnoreCase(String nome);
 
-    /**
-     * Busca membros elegíveis para candidatura a um cargo específico
-     */
-    List<Membro> findMembrosElegiveisParaCargo(String nomeCargo);
-
-    /**
-     * Conta membros por cargo
-     */
-    long countMembrosPorCargo(UUID cargoId);
-
-    /**
-     * Busca membros sem cargo definido
-     */
-    List<Membro> findMembrosSemCargo();
-
-    /**
-     * Busca membros com perfil completo
-     */
-    List<Membro> findMembrosComPerfilCompleto();
 }
